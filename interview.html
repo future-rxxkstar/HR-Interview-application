@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -332,9 +333,14 @@
     // Only apply a key if the read actually succeeded — on failure, keep whatever
     // is already showing instead of wiping it out with an empty fallback.
     if(cand.ok) state.candidates = cand.value || [];
-    if(sA.ok) state.scores.A = sA.value || {};
-    if(sB.ok) state.scores.B = sB.value || {};
-    if(sC.ok) state.scores.C = sC.value || {};
+    // Never let the background poll overwrite the score set the CURRENT interviewer is
+    // actively editing — only that interviewer writes to this key, so the local copy is
+    // already the freshest truth. Overwriting it with a server read risked clobbering a
+    // just-made selection before the write had fully landed (the "grade disappears right
+    // after picking it" bug). Other interviewers' / admin's own polls are unaffected.
+    if(sA.ok && state.role !== 'A') state.scores.A = sA.value || {};
+    if(sB.ok && state.role !== 'B') state.scores.B = sB.value || {};
+    if(sC.ok && state.role !== 'C') state.scores.C = sC.value || {};
     if(rev.ok) state.revealed = !!rev.value;
     state.loaded = true;
     render();
@@ -1116,5 +1122,4 @@
 </script>
 </body>
 </html>
- 
 
