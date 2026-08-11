@@ -35,7 +35,7 @@
     -webkit-font-smoothing:antialiased;
   }
   #app{max-width:1180px;margin:0 auto;padding:28px 20px 80px;}
-
+ 
   .topbar{
     display:flex;justify-content:space-between;align-items:flex-end;
     margin-bottom:22px;flex-wrap:wrap;gap:14px;
@@ -53,7 +53,7 @@
   }
   .role-tab.active{background:var(--ink);color:#fff;}
   .role-tab:hover:not(.active){background:var(--bg);color:var(--ink);}
-
+ 
   .card{
     background:var(--card);border:1px solid var(--line);border-radius:16px;
     padding:22px 22px;margin-bottom:20px;
@@ -61,7 +61,7 @@
   .card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
   .card-title{font-size:15px;font-weight:700;margin:0;}
   .card-sub{font-size:12.5px;color:var(--muted);margin-top:3px;}
-
+ 
   .btn{
     font-family:var(--sans);font-weight:700;font-size:13px;border-radius:9px;
     padding:9px 16px;border:1px solid var(--line);background:var(--card);color:var(--ink);
@@ -75,7 +75,7 @@
   .btn-danger{background:transparent;color:var(--danger);border-color:var(--danger);}
   .btn-danger:hover{background:#FBEDEA;}
   .btn:disabled{opacity:.45;cursor:not-allowed;}
-
+ 
   .upload-zone{
     border:1.5px dashed var(--line);border-radius:12px;padding:28px;text-align:center;
     background:var(--bg);cursor:pointer;transition:all .15s;
@@ -85,44 +85,44 @@
   .upload-zone .icon{font-size:26px;margin-bottom:6px;}
   .upload-zone .txt{font-weight:700;font-size:13.5px;}
   .upload-zone .sub{font-size:12px;color:var(--muted);margin-top:4px;}
-
+ 
   table{width:100%;border-collapse:collapse;font-size:13px;}
   th{
     text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;
     text-transform:uppercase;color:var(--muted);font-weight:600;
     padding:8px 10px;border-bottom:1.5px solid var(--line);white-space:nowrap;
   }
-  td{padding:10px 10px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  td{padding:10px 10px;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap;}
   tr:last-child td{border-bottom:none;}
-  .table-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--line);}
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:10px;border:1px solid var(--line);}
   .table-wrap table{margin:0;}
   .table-wrap th:first-child, .table-wrap td:first-child{padding-left:14px;}
-
+ 
   .name-cell{font-weight:700;}
   .sub-cell{color:var(--muted);font-size:12px;}
   .mono-cell{font-family:var(--mono);color:var(--slate);font-weight:600;font-size:12.5px;}
-  .exp-cell{color:var(--slate);font-size:12px;max-width:260px;}
+  .exp-cell{color:var(--slate);font-size:12px;}
   .career-item{display:flex;align-items:baseline;gap:6px;margin-bottom:4px;line-height:1.4;}
   .career-item:last-child{margin-bottom:0;}
   .career-idx{
     font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--teal);
     background:var(--teal-soft);border-radius:5px;padding:1px 5px;flex-shrink:0;
   }
-
+ 
   select.grade-select{
     font-family:var(--mono);font-weight:600;font-size:13px;
     border:1px solid var(--line);border-radius:7px;padding:5px 6px;
     background:var(--bg);color:var(--ink);cursor:pointer;
   }
   select.grade-select:focus{outline:2px solid var(--teal);outline-offset:1px;}
-
+ 
   .avg-pill{
     font-family:var(--mono);font-weight:600;font-size:13px;
     background:var(--teal-soft);color:var(--teal);padding:4px 9px;border-radius:7px;
     display:inline-block;
   }
   .avg-pill.empty{background:var(--bg);color:var(--muted);}
-
+ 
   .rank-badge{
     font-family:var(--mono);font-weight:700;font-size:13px;
     width:30px;height:30px;border-radius:50%;display:inline-flex;
@@ -131,27 +131,27 @@
   .rank-badge.r1{background:var(--gold);color:#fff;}
   .rank-badge.r2{background:var(--silver);color:#fff;}
   .rank-badge.r3{background:var(--bronze);color:#fff;}
-
+ 
   .status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;}
   .status-dot.done{background:var(--teal);}
   .status-dot.pending{background:var(--line);}
-
+ 
   .banner{
     display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:10px;
     font-size:12.5px;line-height:1.5;
   }
   .banner.info{background:var(--teal-soft);color:#1F5A4C;}
   .banner.warn{background:var(--amber-soft);color:#8A5316;}
-
+ 
   .empty-state{text-align:center;padding:50px 20px;color:var(--muted);}
   .empty-state .big{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:6px;}
-
+ 
   .filter-input{
     font-family:var(--sans);font-size:13px;padding:8px 12px;border-radius:9px;
     border:1px solid var(--line);background:var(--bg);width:200px;
   }
   .filter-input:focus{outline:2px solid var(--teal);outline-offset:1px;}
-
+ 
   .grade-legend{
     display:flex;flex-wrap:wrap;gap:8px 18px;
     background:var(--bg);border:1px solid var(--line);border-radius:10px;
@@ -163,14 +163,14 @@
     background:var(--ink);color:#fff;border-radius:6px;padding:2px 7px;flex-shrink:0;
   }
   .grade-legend-def{color:var(--slate);}
-
+ 
   .toggle-wrap{display:flex;align-items:center;gap:10px;}
   .reveal-state{font-family:var(--mono);font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:7px;}
   .reveal-state.on{background:var(--teal-soft);color:var(--teal);}
   .reveal-state.off{background:#F1E4E1;color:var(--danger);}
-
+ 
   .footer-note{font-size:11.5px;color:var(--muted);text-align:center;margin-top:26px;}
-
+ 
   .toast-container{
     position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
     z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:center;
@@ -181,7 +181,7 @@
     animation:toast-in .18s ease-out;
   }
   @keyframes toast-in{ from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:translateY(0);} }
-
+ 
   @media (max-width:640px){
     h1{font-size:19px;}
     .card{padding:16px;}
@@ -191,7 +191,7 @@
 </head>
 <body>
 <div id="app"></div>
-
+ 
 <script>
 (function(){
   const GRADE_MAP = { 'A':100, 'B+':95, 'B':90, 'C':80, 'D':70, 'E':0 };
@@ -205,7 +205,7 @@
     'E': '불참석',
   };
   const INTERVIEWERS = ['A','B','C'];
-
+ 
   let state = {
     role: null,
     pendingRole: null,
@@ -222,10 +222,10 @@
     loaded: false,
     saving: false,
   };
-
+ 
   const app = document.getElementById('app');
   function roundKey(roundId, base){ return `round:${roundId}:${base}`; }
-
+ 
   // The round whose candidates/scores should currently be shown:
   // - Interviewers always follow whatever round the admin marked "active".
   // - The admin can browse a different (past) round without disturbing what
@@ -233,7 +233,7 @@
   function currentRoundId(){
     return state.role === 'admin' ? (state.viewRoundId || state.activeRoundId) : state.activeRoundId;
   }
-
+ 
   // ---------- storage helpers ----------
   // Backed by a Google Apps Script web app that reads/writes a Google Sheet, so it works
   // whether this page is opened inside Claude.ai, downloaded and opened locally, or hosted
@@ -242,7 +242,7 @@
   // Must exactly match SECRET_TOKEN in the Apps Script code — anyone with both this file
   // and the token can read/write the sheet, so don't publish this file publicly as-is.
   const SECRET_TOKEN = 'ffc4717c87628ccae6cf0bdd2e8cefcef3bb5e9e2a280e5c';
-
+ 
   // getShared returns { ok:true, value } on a genuine read, or { ok:false } if the read
   // failed / key doesn't exist yet. Callers should NOT blindly overwrite good local state
   // with a failed read — that was the bug causing uploaded data to "disappear" on the
@@ -255,7 +255,7 @@
       return { ok:true, value: JSON.parse(data.value) };
     }catch(e){ return { ok:false }; }
   }
-
+ 
   async function setShared(key, value, tries=3){
     for(let i=0;i<tries;i++){
       try{
@@ -274,7 +274,7 @@
     }
     return false;
   }
-
+ 
   async function loadAll(){
     const [roundsRes, activeRes, pins] = await Promise.all([
       getShared('rounds'),
@@ -285,7 +285,7 @@
     if(activeRes.ok) state.activeRoundId = activeRes.value || null;
     if(pins.ok && pins.value) state.pins = { ...state.pins, ...pins.value };
     if(!state.viewRoundId) state.viewRoundId = state.activeRoundId;
-
+ 
     const rid = currentRoundId();
     if(!rid){
       state.candidates = [];
@@ -312,7 +312,7 @@
     state.loaded = true;
     render();
   }
-
+ 
   // ---------- round management ----------
   async function createRound(){
     const name = prompt('새 면접 회차의 이름을 입력해주세요 (예: 2026년 상반기 신입 공채 1차)', '');
@@ -337,19 +337,19 @@
       setShared(roundKey(id,'revealed'), false),
     ]);
   }
-
+ 
   async function switchViewRound(id){
     state.viewRoundId = id;
     await loadAll();
   }
-
+ 
   async function makeActiveRound(id){
     if(!confirm('이 회차를 다시 "진행 중"으로 전환하면, 면접관 A/B/C의 화면이 이 회차 데이터로 바뀝니다. 계속할까요?')) return;
     state.activeRoundId = id;
     render();
     await setShared('activeRoundId', id);
   }
-
+ 
   // ---------- excel parsing ----------
   function classifyHeader(h){
     const s = String(h||'').replace(/\s/g,'');
@@ -361,7 +361,7 @@
     if(/대학|학교/.test(s)) return 'university';
     return null;
   }
-
+ 
   // Recognises structured career columns (경력1, 경력종류1, 경력기간1 …) and 나이,
   // so they can be parsed into a clean per-entry list instead of dumped as raw text.
   function classifyColumn(header){
@@ -374,7 +374,7 @@
     const basic = classifyHeader(header);
     return basic ? { type: basic } : null;
   }
-
+ 
   function handleFile(file){
     const reader = new FileReader();
     reader.onload = async (e)=>{
@@ -387,7 +387,7 @@
         const headers = rows[0];
         const cols = headers.map(classifyColumn);
         const hasName = cols.some(c => c && c.type === 'name');
-
+ 
         const candidates = [];
         let seq = 0;
         for(let i=1;i<rows.length;i++){
@@ -430,7 +430,7 @@
           candidates.push(rec);
         }
         if(candidates.length === 0){ alert('인식할 수 있는 지원자 행이 없습니다.'); return; }
-
+ 
         if(state.candidates.length > 0){
           if(!confirm(`이미 ${state.candidates.length}명의 지원자 데이터가 있습니다. 새로 업로드한 ${candidates.length}명으로 덮어쓰면 기존 채점 결과와 매칭이 깨질 수 있습니다. 계속할까요?`)) return;
         }
@@ -448,7 +448,7 @@
     };
     reader.readAsArrayBuffer(file);
   }
-
+ 
   async function resetAll(){
     if(!confirm('이번 회차의 모든 지원자 정보와 채점 결과, 공개 상태가 초기화됩니다. 계속할까요?')) return;
     const rid = currentRoundId();
@@ -464,14 +464,14 @@
     ]);
     render();
   }
-
+ 
   async function toggleReveal(){
     const rid = currentRoundId();
     state.revealed = !state.revealed;
     render();
     await setShared(roundKey(rid,'revealed'), state.revealed);
   }
-
+ 
   async function setScore(letter, candidateId, field, grade){
     const rid = state.activeRoundId; // 면접관은 항상 현재 진행 중인 회차에 채점
     if(!state.scores[letter][candidateId]) state.scores[letter][candidateId] = {};
@@ -483,7 +483,7 @@
     // of false-alarm popups. loadAll()'s poll will simply keep syncing in the background.
     await setShared(roundKey(rid, 'scores_' + letter), state.scores[letter]);
   }
-
+ 
   // ---------- toast (non-blocking notification) ----------
   function showToast(msg){
     let container = document.getElementById('toastContainer');
@@ -499,14 +499,14 @@
     container.appendChild(t);
     setTimeout(()=>{ t.remove(); }, 3500);
   }
-
+ 
   // ---------- calc ----------
   function ownAvg(letter, candidateId){
     const s = state.scores[letter][candidateId];
     if(!s || !s.job || !s.culture) return null;
     return (GRADE_MAP[s.job] + GRADE_MAP[s.culture]) / 2;
   }
-
+ 
   // Standard "1-2-2-4" competition ranking: candidates with an equal score share the
   // same rank, and the next distinct (lower) score skips ahead to its true position —
   // e.g. scores [100, 99, 99, 98] over 10 people become ranks [1, 2, 2, 4].
@@ -521,7 +521,7 @@
       return { ...item, rank };
     });
   }
-
+ 
   function computeOwnRanking(letter){
     const list = state.candidates
       .map(c => ({ c, avg: ownAvg(letter, c.id) }))
@@ -529,7 +529,7 @@
       .sort((a,b)=> b.avg - a.avg);
     return assignStandardRanks(list, x => x.avg);
   }
-
+ 
   // Map of candidateId -> { rank, total } among everyone this interviewer has finished scoring.
   function computeOwnRankMap(letter){
     const ranking = computeOwnRanking(letter);
@@ -537,7 +537,7 @@
     ranking.forEach(r => { map[r.c.id] = { rank: r.rank, total: ranking.length }; });
     return map;
   }
-
+ 
   function computeFinal(){
     const all = state.candidates.map(c=>{
       const per = INTERVIEWERS.map(k => ownAvg(k, c.id));
@@ -549,41 +549,41 @@
     const incomplete = all.filter(r=>!r.complete);
     return { complete, incomplete };
   }
-
+ 
   function rankBadgeClass(rank){
     if(rank===1) return 'rank-badge r1';
     if(rank===2) return 'rank-badge r2';
     if(rank===3) return 'rank-badge r3';
     return 'rank-badge';
   }
-
+ 
   function fmt(n){ return n===null || n===undefined ? '-' : n.toFixed(1); }
-
+ 
   function filteredCandidates(){
     if(!state.filter.trim()) return state.candidates;
     const q = state.filter.trim();
     return state.candidates.filter(c => (c.name||'').includes(q) || (c.examNo||'').includes(q));
   }
-
+ 
   // ---------- render ----------
   function el(html){ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; }
-
+ 
   const ROLE_LABELS = { admin:'관리자', A:'면접관 A', B:'면접관 B', C:'면접관 C' };
-
+ 
   function render(){
     app.innerHTML = '';
     app.appendChild(renderTop());
-
+ 
     if(!state.loaded){
       app.appendChild(el(`<div class="card"><div class="empty-state">불러오는 중…</div></div>`));
       return;
     }
-
+ 
     if(state.pendingRole){
       app.appendChild(renderPinGate());
       return;
     }
-
+ 
     if(!state.role){
       app.appendChild(el(`
         <div class="card">
@@ -594,16 +594,16 @@
         </div>`));
       return;
     }
-
+ 
     if(state.role === 'admin'){
       app.appendChild(renderAdmin());
     } else {
       app.appendChild(renderInterviewer(state.role));
     }
-
+ 
     app.appendChild(el(`<div class="footer-note">데이터는 이 페이지를 사용하는 모든 사람과 공유됩니다 · 면접관 점수는 관리자가 공개하기 전까지 서로에게 보이지 않습니다</div>`));
   }
-
+ 
   function renderPinGate(){
     const role = state.pendingRole;
     const card = el(`
@@ -621,7 +621,7 @@
           <button class="btn btn-primary" id="pinSubmitBtn">확인</button>
         </div>
       </div>`);
-
+ 
     const field = card.querySelector('#pinField');
     const submit = ()=>{
       const val = field.value.trim();
@@ -652,7 +652,7 @@
     setTimeout(()=> field.focus(), 0);
     return card;
   }
-
+ 
   function renderTop(){
     const wrap = el(`<div class="topbar">
       <div>
@@ -686,7 +686,7 @@
     }
     return wrap;
   }
-
+ 
   function renderPinSettingsCard(){
     const card = el(`
       <div class="card">
@@ -722,7 +722,7 @@
     wrap.appendChild(table);
     return card;
   }
-
+ 
   async function savePin(role, value, btnEl){
     if(value.length !== 4){
       showToast('코드는 4자리 숫자로 입력해주세요.');
@@ -738,7 +738,7 @@
     if(ok){ showToast(`${ROLE_LABELS[role]} 코드가 변경되었습니다.`); }
     else{ showToast('코드 저장에 실패했습니다. 다시 시도해주세요.'); }
   }
-
+ 
   function renderRoundManagementCard(){
     const viewId = currentRoundId();
     const activeId = state.activeRoundId;
@@ -784,18 +784,18 @@
     }
     return card;
   }
-
+ 
   function renderAdmin(){
     const wrap = document.createElement('div');
     wrap.appendChild(renderRoundManagementCard());
-
+ 
     if(state.rounds.length === 0){
       return wrap; // 회차를 만들기 전에는 나머지 카드는 보여줄 필요가 없음
     }
-
+ 
     const rid = currentRoundId();
     const isActive = rid === state.activeRoundId;
-
+ 
     // upload card
     const uploadCard = el(`
       <div class="card">
@@ -824,13 +824,13 @@
       if(resetBtn) resetBtn.addEventListener('click', resetAll);
     }
     wrap.appendChild(uploadCard);
-
+ 
     wrap.appendChild(renderPinSettingsCard());
-
+ 
     if(state.candidates.length === 0){
       return wrap;
     }
-
+ 
     // progress card
     const progressCard = el(`
       <div class="card">
@@ -859,7 +859,7 @@
         <td>${state.candidates.length}명</td>
       </tr></tbody></table>`));
     wrap.appendChild(progressCard);
-
+ 
     // final ranking card (admin can always preview)
     const finalCard = el(`
       <div class="card">
@@ -873,10 +873,10 @@
       </div>`);
     finalCard.querySelector('#finalTableWrap').appendChild(buildFinalTable());
     wrap.appendChild(finalCard);
-
+ 
     return wrap;
   }
-
+ 
   function buildFinalTable(){
     const { complete, incomplete } = computeFinal();
     const rowsHtml = complete.map(r=>{
@@ -905,24 +905,24 @@
     }
     return table;
   }
-
+ 
   function renderInterviewer(letter){
     const wrap = document.createElement('div');
-
+ 
     if(!state.activeRoundId){
       wrap.appendChild(el(`<div class="card"><div class="empty-state"><div class="big">진행 중인 면접 회차가 없습니다</div>관리자가 새 회차를 시작하면 자동으로 이곳에 표시됩니다.</div></div>`));
       return wrap;
     }
-
+ 
     if(state.candidates.length === 0){
       wrap.appendChild(el(`<div class="card"><div class="empty-state"><div class="big">아직 등록된 지원자가 없습니다</div>관리자가 지원자 명단을 업로드하면 이곳에 표시됩니다.</div></div>`));
       return wrap;
     }
-
+ 
     wrap.appendChild(el(`<div class="banner info">
       🔒 면접관 ${letter}님은 본인이 입력한 점수만 볼 수 있습니다. 다른 면접관의 점수와 순위는 관리자가 <b>전체 순위 공개</b>를 하기 전까지 보이지 않습니다.
     </div>`));
-
+ 
     const scoreCard = el(`
       <div class="card" style="margin-top:16px;">
         <div class="card-head">
@@ -940,7 +940,7 @@
     });
     scoreCard.querySelector('#scoreTableWrap').appendChild(buildScoreTable(letter));
     wrap.appendChild(scoreCard);
-
+ 
     // own live ranking
     const ranking = computeOwnRanking(letter);
     const rankCard = el(`
@@ -969,7 +969,7 @@
       ownWrap.appendChild(el(`<table><thead><tr><th>순위</th><th>순번</th><th>수험번호</th><th>이름</th><th>기본정보</th><th>경력</th><th>평균</th></tr></thead><tbody>${rows}</tbody></table>`));
     }
     wrap.appendChild(rankCard);
-
+ 
     // if revealed, show final table too
     if(state.revealed){
       const finalCard = el(`
@@ -985,10 +985,10 @@
       finalCard.querySelector('#finalTableWrap2').appendChild(buildFinalTable());
       wrap.appendChild(finalCard);
     }
-
+ 
     return wrap;
   }
-
+ 
   function buildScoreTable(letter){
     const list = filteredCandidates();
     if(list.length === 0){
@@ -1027,7 +1027,7 @@
     });
     return table;
   }
-
+ 
   function renderGradeLegend(){
     const items = Object.entries(GRADE_DEFINITIONS).map(([grade, def])=>{
       return `<div class="grade-legend-item">
@@ -1037,7 +1037,7 @@
     }).join('');
     return `<div class="grade-legend">${items}</div>`;
   }
-
+ 
   function buildGradeSelect(current, onChange){
     const sel = el(`<select class="grade-select">
       <option value="">-</option>
@@ -1046,12 +1046,12 @@
     sel.addEventListener('change', (e)=>{ if(e.target.value) onChange(e.target.value); });
     return sel;
   }
-
+ 
   function escapeHtml(s){
     return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   }
   function escapeAttr(s){ return escapeHtml(s); }
-
+ 
   // Renders a candidate's structured career list (경력1/경력종류1/경력기간1 …) as clean,
   // numbered entries instead of one run-on line — most recent (경력1) first.
   // "중앙일보(2024.06.11~2025.08.09)" 처럼 회사명 칸에 기간이 괄호로 같이 들어있는 경우,
@@ -1062,7 +1062,7 @@
     if(m) return { name: m[1].trim(), period: m[2].trim() };
     return { name: s, period: '' };
   }
-
+ 
   function renderCareerCell(c){
     const careers = c.careers || [];
     if(careers.length === 0){
@@ -1081,7 +1081,7 @@
     const otherLine = c.otherInfo ? `<div class="sub-cell" style="margin-top:4px;">${escapeHtml(c.otherInfo)}</div>` : '';
     return items + otherLine;
   }
-
+ 
   // ---------- boot ----------
   loadAll();
   setInterval(loadAll, 3000);
@@ -1089,4 +1089,4 @@
 </script>
 </body>
 </html>
-
+ 
