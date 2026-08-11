@@ -171,6 +171,33 @@
  
   .footer-note{font-size:11.5px;color:var(--muted);text-align:center;margin-top:26px;}
  
+  /* On narrow screens, tables with many columns (score entry, rankings) switch from a
+     wide table to a stacked "label above value" card per row, so nothing needs horizontal
+     scrolling — the 등수/평균 column especially was getting cut off requiring a swipe that
+     kept snapping back on refresh. */
+  @media (max-width: 720px){
+    .responsive-table thead{ display:none; }
+    .responsive-table, .responsive-table tbody, .responsive-table tr, .responsive-table td{
+      display:block; width:100%;
+    }
+    .responsive-table{ border-collapse:separate; }
+    .responsive-table tr{
+      border:1px solid var(--line); border-radius:10px; padding:10px 12px 12px;
+      margin-bottom:10px; background:var(--card);
+    }
+    .responsive-table tr:last-child{ margin-bottom:0; }
+    .responsive-table td{
+      border:none; border-bottom:1px dashed var(--line);
+      padding:7px 0; white-space:normal;
+    }
+    .responsive-table td:last-child{ border-bottom:none; padding-bottom:0; }
+    .responsive-table td::before{
+      content: attr(data-label);
+      display:block; font-family:var(--mono); font-size:10px; font-weight:700;
+      color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px;
+    }
+  }
+ 
   .toast-container{
     position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
     z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:center;
@@ -881,22 +908,22 @@
     const { complete, incomplete } = computeFinal();
     const rowsHtml = complete.map(r=>{
       return `<tr>
-        <td><span class="${rankBadgeClass(r.rank)}">${r.rank}</span></td>
-        <td class="mono-cell">${escapeHtml(r.c.examNo||'-')}</td>
-        <td class="name-cell">${escapeHtml(r.c.name)}</td>
-        <td><span class="avg-pill">${fmt(r.per[0])}</span></td>
-        <td><span class="avg-pill">${fmt(r.per[1])}</span></td>
-        <td><span class="avg-pill">${fmt(r.per[2])}</span></td>
-        <td><span class="avg-pill" style="background:var(--ink);color:#fff;">${r.total.toFixed(1)}</span></td>
+        <td data-label="순위"><span class="${rankBadgeClass(r.rank)}">${r.rank}</span></td>
+        <td class="mono-cell" data-label="수험번호">${escapeHtml(r.c.examNo||'-')}</td>
+        <td class="name-cell" data-label="이름">${escapeHtml(r.c.name)}</td>
+        <td data-label="면접관 A"><span class="avg-pill">${fmt(r.per[0])}</span></td>
+        <td data-label="면접관 B"><span class="avg-pill">${fmt(r.per[1])}</span></td>
+        <td data-label="면접관 C"><span class="avg-pill">${fmt(r.per[2])}</span></td>
+        <td data-label="총점 (300점)"><span class="avg-pill" style="background:var(--ink);color:#fff;">${r.total.toFixed(1)}</span></td>
       </tr>`;
     }).join('');
     const incompleteHtml = incomplete.map(r=>`<tr>
-        <td>-</td>
-        <td class="mono-cell">${escapeHtml(r.c.examNo||'-')}</td>
-        <td class="name-cell">${escapeHtml(r.c.name)}</td>
-        <td colspan="4" class="sub-cell">평가 진행 중 (${r.doneCount}/3명 완료)</td>
+        <td data-label="순위">-</td>
+        <td class="mono-cell" data-label="수험번호">${escapeHtml(r.c.examNo||'-')}</td>
+        <td class="name-cell" data-label="이름">${escapeHtml(r.c.name)}</td>
+        <td colspan="4" class="sub-cell" data-label="진행 상태">평가 진행 중 (${r.doneCount}/3명 완료)</td>
       </tr>`).join('');
-    const table = el(`<table>
+    const table = el(`<table class="responsive-table">
       <thead><tr><th>순위</th><th>수험번호</th><th>이름</th><th>면접관 A</th><th>면접관 B</th><th>면접관 C</th><th>총점 (300점)</th></tr></thead>
       <tbody>${rowsHtml || ''}${incompleteHtml}</tbody>
     </table>`);
@@ -958,15 +985,15 @@
       ownWrap.appendChild(el(`<div class="empty-state">아직 완료한 평가가 없습니다.</div>`));
     } else {
       const rows = ranking.map((r,i)=>`<tr>
-          <td><span class="${rankBadgeClass(r.rank)}">${r.rank}</span></td>
-          <td class="mono-cell">${i+1}</td>
-          <td class="mono-cell">${escapeHtml(r.c.examNo||'-')}</td>
-          <td class="name-cell">${escapeHtml(r.c.name)}</td>
-          <td class="sub-cell">${escapeHtml(r.c.dob||'-')} · ${escapeHtml(r.c.gender||'-')}${r.c.age ? ' · '+escapeHtml(r.c.age) : ''}<br>${escapeHtml(r.c.university||'-')} ${escapeHtml(r.c.department||'')}</td>
-          <td class="exp-cell">${renderCareerCell(r.c)}</td>
-          <td><span class="avg-pill">${fmt(r.avg)}점</span></td>
+          <td data-label="순위"><span class="${rankBadgeClass(r.rank)}">${r.rank}</span></td>
+          <td class="mono-cell" data-label="순번">${i+1}</td>
+          <td class="mono-cell" data-label="수험번호">${escapeHtml(r.c.examNo||'-')}</td>
+          <td class="name-cell" data-label="이름">${escapeHtml(r.c.name)}</td>
+          <td class="sub-cell" data-label="기본정보">${escapeHtml(r.c.dob||'-')} · ${escapeHtml(r.c.gender||'-')}${r.c.age ? ' · '+escapeHtml(r.c.age) : ''}<br>${escapeHtml(r.c.university||'-')} ${escapeHtml(r.c.department||'')}</td>
+          <td class="exp-cell" data-label="경력">${renderCareerCell(r.c)}</td>
+          <td data-label="평균"><span class="avg-pill">${fmt(r.avg)}점</span></td>
         </tr>`).join('');
-      ownWrap.appendChild(el(`<table><thead><tr><th>순위</th><th>순번</th><th>수험번호</th><th>이름</th><th>기본정보</th><th>경력</th><th>평균</th></tr></thead><tbody>${rows}</tbody></table>`));
+      ownWrap.appendChild(el(`<table class="responsive-table"><thead><tr><th>순위</th><th>순번</th><th>수험번호</th><th>이름</th><th>기본정보</th><th>경력</th><th>평균</th></tr></thead><tbody>${rows}</tbody></table>`));
     }
     wrap.appendChild(rankCard);
  
@@ -995,7 +1022,7 @@
       return el(`<div class="empty-state">검색 결과가 없습니다.</div>`);
     }
     const rankMap = computeOwnRankMap(letter);
-    const table = el(`<table>
+    const table = el(`<table class="responsive-table">
       <thead><tr>
         <th>순번</th><th>수험번호</th><th>이름</th><th>기본 정보</th><th>경력</th><th>직무적합도</th><th>조직적합도</th><th>평균 · 내 등수</th>
       </tr></thead>
@@ -1010,14 +1037,14 @@
         ? '미평가'
         : `${fmt(avg)}점 · <span class="mono-cell" style="color:inherit;font-weight:700;">${rinfo.rank}/${rinfo.total}등</span>`;
       const tr = el(`<tr>
-        <td class="mono-cell">${i+1}</td>
-        <td class="mono-cell">${escapeHtml(c.examNo||'-')}</td>
-        <td class="name-cell">${escapeHtml(c.name)}</td>
-        <td class="sub-cell">${escapeHtml(c.dob||'-')} · ${escapeHtml(c.gender||'-')}${c.age ? ' · '+escapeHtml(c.age) : ''}<br>${escapeHtml(c.university||'-')} ${escapeHtml(c.department||'')}</td>
-        <td class="exp-cell">${renderCareerCell(c)}</td>
-        <td></td>
-        <td></td>
-        <td><span class="avg-pill ${avg===null?'empty':''}">${avgLabel}</span></td>
+        <td class="mono-cell" data-label="순번">${i+1}</td>
+        <td class="mono-cell" data-label="수험번호">${escapeHtml(c.examNo||'-')}</td>
+        <td class="name-cell" data-label="이름">${escapeHtml(c.name)}</td>
+        <td class="sub-cell" data-label="기본 정보">${escapeHtml(c.dob||'-')} · ${escapeHtml(c.gender||'-')}${c.age ? ' · '+escapeHtml(c.age) : ''}<br>${escapeHtml(c.university||'-')} ${escapeHtml(c.department||'')}</td>
+        <td class="exp-cell" data-label="경력">${renderCareerCell(c)}</td>
+        <td data-label="직무적합도"></td>
+        <td data-label="조직적합도"></td>
+        <td data-label="평균 · 내 등수"><span class="avg-pill ${avg===null?'empty':''}">${avgLabel}</span></td>
       </tr>`);
       const jobTd = tr.children[5];
       const cultureTd = tr.children[6];
@@ -1089,4 +1116,3 @@
 </script>
 </body>
 </html>
- 
