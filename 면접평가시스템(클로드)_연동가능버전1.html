@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>면접 평가 시스템</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#16233F;
+    --slate:#3C4759;
+    --muted:#7C8798;
+    --bg:#F3F5F8;
+    --card:#FFFFFF;
+    --line:#E1E5EB;
+    --teal:#2F7D6B;
+    --teal-soft:#E6F1EE;
+    --amber:#C97A2B;
+    --amber-soft:#FBEEE0;
+    --danger:#B0432E;
+    --gold:#C9A227;
+    --silver:#8C97A6;
+    --bronze:#A8683A;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'Noto Sans KR', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:var(--sans);
+    background:var(--bg);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  #app{max-width:1180px;margin:0 auto;padding:28px 20px 80px;}
+
+  .topbar{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    margin-bottom:22px;flex-wrap:wrap;gap:14px;
+  }
+  .brand-eyebrow{
+    font-family:var(--mono);font-size:11px;letter-spacing:.14em;
+    color:var(--teal);text-transform:uppercase;margin-bottom:4px;font-weight:600;
+  }
+  h1{font-size:22px;font-weight:900;margin:0;letter-spacing:-.01em;}
+  .role-tabs{display:flex;gap:6px;background:var(--card);padding:5px;border-radius:12px;border:1px solid var(--line);}
+  .role-tab{
+    border:none;background:transparent;padding:9px 14px;border-radius:9px;
+    font-family:var(--sans);font-weight:700;font-size:13px;color:var(--muted);cursor:pointer;
+    transition:all .15s;
+  }
+  .role-tab.active{background:var(--ink);color:#fff;}
+  .role-tab:hover:not(.active){background:var(--bg);color:var(--ink);}
+
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:22px 22px;margin-bottom:20px;
+  }
+  .card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+  .card-title{font-size:15px;font-weight:700;margin:0;}
+  .card-sub{font-size:12.5px;color:var(--muted);margin-top:3px;}
+
+  .btn{
+    font-family:var(--sans);font-weight:700;font-size:13px;border-radius:9px;
+    padding:9px 16px;border:1px solid var(--line);background:var(--card);color:var(--ink);
+    cursor:pointer;transition:all .15s;
+  }
+  .btn:hover{border-color:var(--ink);}
+  .btn-primary{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .btn-primary:hover{background:#0e1730;}
+  .btn-teal{background:var(--teal);color:#fff;border-color:var(--teal);}
+  .btn-teal:hover{background:#256657;}
+  .btn-danger{background:transparent;color:var(--danger);border-color:var(--danger);}
+  .btn-danger:hover{background:#FBEDEA;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+
+  .upload-zone{
+    border:1.5px dashed var(--line);border-radius:12px;padding:28px;text-align:center;
+    background:var(--bg);cursor:pointer;transition:all .15s;
+  }
+  .upload-zone:hover{border-color:var(--teal);background:var(--teal-soft);}
+  .upload-zone input{display:none;}
+  .upload-zone .icon{font-size:26px;margin-bottom:6px;}
+  .upload-zone .txt{font-weight:700;font-size:13.5px;}
+  .upload-zone .sub{font-size:12px;color:var(--muted);margin-top:4px;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{
+    text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--muted);font-weight:600;
+    padding:8px 10px;border-bottom:1.5px solid var(--line);white-space:nowrap;
+  }
+  td{padding:10px 10px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  .table-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--line);}
+  .table-wrap table{margin:0;}
+  .table-wrap th:first-child, .table-wrap td:first-child{padding-left:14px;}
+
+  .name-cell{font-weight:700;}
+  .sub-cell{color:var(--muted);font-size:12px;}
+  .mono-cell{font-family:var(--mono);color:var(--slate);font-weight:600;font-size:12.5px;}
+  .exp-cell{color:var(--slate);font-size:12px;max-width:260px;}
+  .career-item{display:flex;align-items:baseline;gap:6px;margin-bottom:4px;line-height:1.4;}
+  .career-item:last-child{margin-bottom:0;}
+  .career-idx{
+    font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--teal);
+    background:var(--teal-soft);border-radius:5px;padding:1px 5px;flex-shrink:0;
+  }
+
+  select.grade-select{
+    font-family:var(--mono);font-weight:600;font-size:13px;
+    border:1px solid var(--line);border-radius:7px;padding:5px 6px;
+    background:var(--bg);color:var(--ink);cursor:pointer;
+  }
+  select.grade-select:focus{outline:2px solid var(--teal);outline-offset:1px;}
+
+  .avg-pill{
+    font-family:var(--mono);font-weight:600;font-size:13px;
+    background:var(--teal-soft);color:var(--teal);padding:4px 9px;border-radius:7px;
+    display:inline-block;
+  }
+  .avg-pill.empty{background:var(--bg);color:var(--muted);}
+
+  .rank-badge{
+    font-family:var(--mono);font-weight:700;font-size:13px;
+    width:30px;height:30px;border-radius:50%;display:inline-flex;
+    align-items:center;justify-content:center;background:var(--bg);color:var(--slate);
+  }
+  .rank-badge.r1{background:var(--gold);color:#fff;}
+  .rank-badge.r2{background:var(--silver);color:#fff;}
+  .rank-badge.r3{background:var(--bronze);color:#fff;}
+
+  .status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;}
+  .status-dot.done{background:var(--teal);}
+  .status-dot.pending{background:var(--line);}
+
+  .banner{
+    display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:10px;
+    font-size:12.5px;line-height:1.5;
+  }
+  .banner.info{background:var(--teal-soft);color:#1F5A4C;}
+  .banner.warn{background:var(--amber-soft);color:#8A5316;}
+
+  .empty-state{text-align:center;padding:50px 20px;color:var(--muted);}
+  .empty-state .big{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:6px;}
+
+  .filter-input{
+    font-family:var(--sans);font-size:13px;padding:8px 12px;border-radius:9px;
+    border:1px solid var(--line);background:var(--bg);width:200px;
+  }
+  .filter-input:focus{outline:2px solid var(--teal);outline-offset:1px;}
+
+  .grade-legend{
+    display:flex;flex-wrap:wrap;gap:8px 18px;
+    background:var(--bg);border:1px solid var(--line);border-radius:10px;
+    padding:12px 14px;margin-bottom:14px;
+  }
+  .grade-legend-item{display:flex;align-items:center;gap:7px;font-size:12px;}
+  .grade-legend-badge{
+    font-family:var(--mono);font-weight:700;font-size:12px;
+    background:var(--ink);color:#fff;border-radius:6px;padding:2px 7px;flex-shrink:0;
+  }
+  .grade-legend-def{color:var(--slate);}
+
+  .toggle-wrap{display:flex;align-items:center;gap:10px;}
+  .reveal-state{font-family:var(--mono);font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:7px;}
+  .reveal-state.on{background:var(--teal-soft);color:var(--teal);}
+  .reveal-state.off{background:#F1E4E1;color:var(--danger);}
+
+  .footer-note{font-size:11.5px;color:var(--muted);text-align:center;margin-top:26px;}
+
+  .toast-container{
+    position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
+    z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:center;
+  }
+  .toast{
+    background:var(--ink);color:#fff;font-family:var(--sans);font-weight:600;font-size:13px;
+    padding:10px 16px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);
+    animation:toast-in .18s ease-out;
+  }
+  @keyframes toast-in{ from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:translateY(0);} }
+
+  @media (max-width:640px){
+    h1{font-size:19px;}
+    .card{padding:16px;}
+    .filter-input{width:100%;}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+(function(){
+  const GRADE_MAP = { 'A':100, 'B+':95, 'B':90, 'C':80, 'D':70, 'E':0 };
+  const GRADES = ['A','B+','B','C','D','E'];
+  const GRADE_DEFINITIONS = {
+    'A': '기대수준 이상',
+    'B+': '기대 수준에 부합함',
+    'B': '대부분 부합하지만 일부 부족함',
+    'C': '근거를 찾을 수 없음',
+    'D': '부합하지 않음',
+    'E': '불참석',
+  };
+  const INTERVIEWERS = ['A','B','C'];
+
+  let state = {
+    role: null,
+    pendingRole: null,
+    pinInput: '',
+    pinError: '',
+    pins: { admin:'0000', A:'1111', B:'2222', C:'3333' },
+    rounds: [],            // [{id, name, createdAt}] — 지금까지 있었던 모든 면접 회차
+    activeRoundId: null,   // 면접관들이 지금 채점하고 있는 회차 (관리자가 지정)
+    viewRoundId: null,     // 관리자가 현재 화면에서 들여다보고 있는 회차 (과거 회차 조회 가능)
+    candidates: [],
+    scores: { A:{}, B:{}, C:{} },
+    revealed: false,
+    filter: '',
+    loaded: false,
+    saving: false,
+  };
+
+  const app = document.getElementById('app');
+  function roundKey(roundId, base){ return `round:${roundId}:${base}`; }
+
+  // The round whose candidates/scores should currently be shown:
+  // - Interviewers always follow whatever round the admin marked "active".
+  // - The admin can browse a different (past) round without disturbing what
+  //   interviewers see, via viewRoundId.
+  function currentRoundId(){
+    return state.role === 'admin' ? (state.viewRoundId || state.activeRoundId) : state.activeRoundId;
+  }
+
+  // ---------- storage helpers ----------
+  // Backed by a Google Apps Script web app that reads/writes a Google Sheet, so it works
+  // whether this page is opened inside Claude.ai, downloaded and opened locally, or hosted
+  // anywhere (GitHub Pages, etc.) — every device just talks to the same spreadsheet.
+  const API_URL = 'https://script.google.com/macros/s/AKfycbwgJkN_pU6UvX-tSgVkVGSZWtCQQ8jsy01zHmLjhMDXIJAZ6NWqmv-_cbse25d1xxVpVA/exec';
+  // Must exactly match SECRET_TOKEN in the Apps Script code — anyone with both this file
+  // and the token can read/write the sheet, so don't publish this file publicly as-is.
+  const SECRET_TOKEN = 'ffc4717c87628ccae6cf0bdd2e8cefcef3bb5e9e2a280e5c';
+
+  // getShared returns { ok:true, value } on a genuine read, or { ok:false } if the read
+  // failed / key doesn't exist yet. Callers should NOT blindly overwrite good local state
+  // with a failed read — that was the bug causing uploaded data to "disappear" on the
+  // next auto-refresh.
+  async function getShared(key){
+    try{
+      const res = await fetch(`${API_URL}?action=get&key=${encodeURIComponent(key)}&token=${encodeURIComponent(SECRET_TOKEN)}`);
+      const data = await res.json();
+      if(!data.ok) return { ok:false };
+      return { ok:true, value: JSON.parse(data.value) };
+    }catch(e){ return { ok:false }; }
+  }
+
+  async function setShared(key, value, tries=3){
+    for(let i=0;i<tries;i++){
+      try{
+        // Content-Type: text/plain avoids triggering a CORS preflight (which Apps
+        // Script web apps don't handle) — the body is still valid JSON underneath;
+        // doPost() on the script side parses it manually.
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action:'set', key, value: JSON.stringify(value), token: SECRET_TOKEN }),
+        });
+        const data = await res.json();
+        if(data.ok) return true;
+      }catch(e){ console.error('storage set failed', key, e); }
+      await new Promise(r=>setTimeout(r, 350));
+    }
+    return false;
+  }
+
+  async function loadAll(){
+    const [roundsRes, activeRes, pins] = await Promise.all([
+      getShared('rounds'),
+      getShared('activeRoundId'),
+      getShared('pins'),
+    ]);
+    if(roundsRes.ok) state.rounds = roundsRes.value || [];
+    if(activeRes.ok) state.activeRoundId = activeRes.value || null;
+    if(pins.ok && pins.value) state.pins = { ...state.pins, ...pins.value };
+    if(!state.viewRoundId) state.viewRoundId = state.activeRoundId;
+
+    const rid = currentRoundId();
+    if(!rid){
+      state.candidates = [];
+      state.scores = { A:{}, B:{}, C:{} };
+      state.revealed = false;
+      state.loaded = true;
+      render();
+      return;
+    }
+    const [cand, sA, sB, sC, rev] = await Promise.all([
+      getShared(roundKey(rid,'candidates')),
+      getShared(roundKey(rid,'scores_A')),
+      getShared(roundKey(rid,'scores_B')),
+      getShared(roundKey(rid,'scores_C')),
+      getShared(roundKey(rid,'revealed')),
+    ]);
+    // Only apply a key if the read actually succeeded — on failure, keep whatever
+    // is already showing instead of wiping it out with an empty fallback.
+    if(cand.ok) state.candidates = cand.value || [];
+    if(sA.ok) state.scores.A = sA.value || {};
+    if(sB.ok) state.scores.B = sB.value || {};
+    if(sC.ok) state.scores.C = sC.value || {};
+    if(rev.ok) state.revealed = !!rev.value;
+    state.loaded = true;
+    render();
+  }
+
+  // ---------- round management ----------
+  async function createRound(){
+    const name = prompt('새 면접 회차의 이름을 입력해주세요 (예: 2026년 상반기 신입 공채 1차)', '');
+    if(name === null) return; // 취소
+    const finalName = name.trim() || `면접 회차 ${state.rounds.length + 1}`;
+    const id = 'r' + Date.now();
+    const round = { id, name: finalName, createdAt: new Date().toISOString() };
+    state.rounds = [...state.rounds, round];
+    state.activeRoundId = id;
+    state.viewRoundId = id;
+    state.candidates = [];
+    state.scores = { A:{}, B:{}, C:{} };
+    state.revealed = false;
+    render();
+    await Promise.all([
+      setShared('rounds', state.rounds),
+      setShared('activeRoundId', id),
+      setShared(roundKey(id,'candidates'), []),
+      setShared(roundKey(id,'scores_A'), {}),
+      setShared(roundKey(id,'scores_B'), {}),
+      setShared(roundKey(id,'scores_C'), {}),
+      setShared(roundKey(id,'revealed'), false),
+    ]);
+  }
+
+  async function switchViewRound(id){
+    state.viewRoundId = id;
+    await loadAll();
+  }
+
+  async function makeActiveRound(id){
+    if(!confirm('이 회차를 다시 "진행 중"으로 전환하면, 면접관 A/B/C의 화면이 이 회차 데이터로 바뀝니다. 계속할까요?')) return;
+    state.activeRoundId = id;
+    render();
+    await setShared('activeRoundId', id);
+  }
+
+  // ---------- excel parsing ----------
+  function classifyHeader(h){
+    const s = String(h||'').replace(/\s/g,'');
+    if(/수험번호|접수번호|응시번호/.test(s)) return 'examNo';
+    if(/이름|성명/.test(s)) return 'name';
+    if(/생년월일|생일/.test(s)) return 'dob';
+    if(/성별/.test(s)) return 'gender';
+    if(/학과|전공/.test(s)) return 'department';
+    if(/대학|학교/.test(s)) return 'university';
+    return null;
+  }
+
+  // Recognises structured career columns (경력1, 경력종류1, 경력기간1 …) and 나이,
+  // so they can be parsed into a clean per-entry list instead of dumped as raw text.
+  function classifyColumn(header){
+    const s = String(header||'').replace(/\s/g,'');
+    if(/^나이$/.test(s)) return { type:'age' };
+    let m;
+    if((m = s.match(/^경력종류(\d+)$/)) || (m = s.match(/^경력(\d+)종류$/))) return { type:'career_type', idx: parseInt(m[1],10) };
+    if((m = s.match(/^경력기간(\d+)$/)) || (m = s.match(/^경력(\d+)기간$/))) return { type:'career_period', idx: parseInt(m[1],10) };
+    if((m = s.match(/^경력(\d+)$/))) return { type:'career_company', idx: parseInt(m[1],10) };
+    const basic = classifyHeader(header);
+    return basic ? { type: basic } : null;
+  }
+
+  function handleFile(file){
+    const reader = new FileReader();
+    reader.onload = async (e)=>{
+      try{
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type:'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header:1, defval:'' });
+        if(rows.length < 2){ alert('엑셀에 데이터가 없습니다.'); return; }
+        const headers = rows[0];
+        const cols = headers.map(classifyColumn);
+        const hasName = cols.some(c => c && c.type === 'name');
+
+        const candidates = [];
+        let seq = 0;
+        for(let i=1;i<rows.length;i++){
+          const row = rows[i];
+          if(row.every(c => String(c).trim()==='')) continue;
+          seq++;
+          const rec = { examNo:'', name:'', dob:'', gender:'', university:'', department:'', age:'' };
+          const careersMap = {};
+          const extras = [];
+          row.forEach((val, idx)=>{
+            const col = cols[idx];
+            const label = headers[idx];
+            const valStr = String(val ?? '').trim();
+            if(!col){
+              if(valStr !== '') extras.push(`${label}: ${val}`);
+              return;
+            }
+            if(col.type === 'career_company'){
+              if(!careersMap[col.idx]) careersMap[col.idx] = {};
+              careersMap[col.idx].company = valStr;
+            } else if(col.type === 'career_type'){
+              if(!careersMap[col.idx]) careersMap[col.idx] = {};
+              careersMap[col.idx].type = valStr;
+            } else if(col.type === 'career_period'){
+              if(!careersMap[col.idx]) careersMap[col.idx] = {};
+              careersMap[col.idx].period = valStr;
+            } else {
+              rec[col.type] = valStr;
+            }
+          });
+          if(!hasName){ rec.name = String(row[0] ?? '').trim(); }
+          if(!rec.examNo){ rec.examNo = String(seq).padStart(3,'0'); } // 엑셀에 수험번호 열이 없으면 순번으로 자동 부여
+          // 경력1이 가장 최근 경력이므로 idx 오름차순 = 최신순으로 정렬
+          rec.careers = Object.keys(careersMap)
+            .map(k => ({ idx: parseInt(k,10), ...careersMap[k] }))
+            .filter(c => (c.company && c.company.trim()) || (c.type && c.type.trim()))
+            .sort((a,b) => a.idx - b.idx);
+          rec.otherInfo = extras.join(', '); // 그 외 분류되지 않은 열 (있을 경우에만 참고용으로 표시)
+          rec.id = 'c' + i + '_' + (rec.name||'').replace(/\s/g,'').slice(0,6) + '_' + Math.random().toString(36).slice(2,6);
+          candidates.push(rec);
+        }
+        if(candidates.length === 0){ alert('인식할 수 있는 지원자 행이 없습니다.'); return; }
+
+        if(state.candidates.length > 0){
+          if(!confirm(`이미 ${state.candidates.length}명의 지원자 데이터가 있습니다. 새로 업로드한 ${candidates.length}명으로 덮어쓰면 기존 채점 결과와 매칭이 깨질 수 있습니다. 계속할까요?`)) return;
+        }
+        state.candidates = candidates;
+        render();
+        const rid = currentRoundId();
+        const ok = await setShared(roundKey(rid,'candidates'), candidates);
+        if(!ok){
+          showToast('저장에 실패했습니다. 네트워크 상태를 확인하고 다시 업로드해주세요.');
+        }
+      }catch(err){
+        console.error(err);
+        alert('엑셀 파일을 읽는 중 문제가 발생했습니다. 파일 형식을 확인해주세요.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  async function resetAll(){
+    if(!confirm('이번 회차의 모든 지원자 정보와 채점 결과, 공개 상태가 초기화됩니다. 계속할까요?')) return;
+    const rid = currentRoundId();
+    state.candidates = [];
+    state.scores = { A:{}, B:{}, C:{} };
+    state.revealed = false;
+    await Promise.all([
+      setShared(roundKey(rid,'candidates'), []),
+      setShared(roundKey(rid,'scores_A'), {}),
+      setShared(roundKey(rid,'scores_B'), {}),
+      setShared(roundKey(rid,'scores_C'), {}),
+      setShared(roundKey(rid,'revealed'), false),
+    ]);
+    render();
+  }
+
+  async function toggleReveal(){
+    const rid = currentRoundId();
+    state.revealed = !state.revealed;
+    render();
+    await setShared(roundKey(rid,'revealed'), state.revealed);
+  }
+
+  async function setScore(letter, candidateId, field, grade){
+    const rid = state.activeRoundId; // 면접관은 항상 현재 진행 중인 회차에 채점
+    if(!state.scores[letter][candidateId]) state.scores[letter][candidateId] = {};
+    state.scores[letter][candidateId][field] = grade;
+    render();
+    // Save quietly in the background. setShared already retries a few times on its own;
+    // we deliberately don't pop up a warning here — the input is already reflected on
+    // screen, and premature "did it really save?" re-checks were themselves the source
+    // of false-alarm popups. loadAll()'s poll will simply keep syncing in the background.
+    await setShared(roundKey(rid, 'scores_' + letter), state.scores[letter]);
+  }
+
+  // ---------- toast (non-blocking notification) ----------
+  function showToast(msg){
+    let container = document.getElementById('toastContainer');
+    if(!container){
+      container = document.createElement('div');
+      container.id = 'toastContainer';
+      container.className = 'toast-container';
+      document.body.appendChild(container);
+    }
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    container.appendChild(t);
+    setTimeout(()=>{ t.remove(); }, 3500);
+  }
+
+  // ---------- calc ----------
+  function ownAvg(letter, candidateId){
+    const s = state.scores[letter][candidateId];
+    if(!s || !s.job || !s.culture) return null;
+    return (GRADE_MAP[s.job] + GRADE_MAP[s.culture]) / 2;
+  }
+
+  // Standard "1-2-2-4" competition ranking: candidates with an equal score share the
+  // same rank, and the next distinct (lower) score skips ahead to its true position —
+  // e.g. scores [100, 99, 99, 98] over 10 people become ranks [1, 2, 2, 4].
+  // `list` must already be sorted descending by scoreOf(item).
+  function assignStandardRanks(list, scoreOf){
+    let rank = 0;
+    let prevScore = null;
+    return list.map((item, i) => {
+      const score = scoreOf(item);
+      if(prevScore === null || score !== prevScore){ rank = i + 1; }
+      prevScore = score;
+      return { ...item, rank };
+    });
+  }
+
+  function computeOwnRanking(letter){
+    const list = state.candidates
+      .map(c => ({ c, avg: ownAvg(letter, c.id) }))
+      .filter(x => x.avg !== null)
+      .sort((a,b)=> b.avg - a.avg);
+    return assignStandardRanks(list, x => x.avg);
+  }
+
+  // Map of candidateId -> { rank, total } among everyone this interviewer has finished scoring.
+  function computeOwnRankMap(letter){
+    const ranking = computeOwnRanking(letter);
+    const map = {};
+    ranking.forEach(r => { map[r.c.id] = { rank: r.rank, total: ranking.length }; });
+    return map;
+  }
+
+  function computeFinal(){
+    const all = state.candidates.map(c=>{
+      const per = INTERVIEWERS.map(k => ownAvg(k, c.id));
+      const doneCount = per.filter(v=>v!==null).length;
+      const total = per.reduce((a,b)=> a + (b||0), 0);
+      return { c, per, total, complete: doneCount===3, doneCount };
+    }).sort((a,b)=> b.total - a.total);
+    const complete = assignStandardRanks(all.filter(r=>r.complete), r => r.total);
+    const incomplete = all.filter(r=>!r.complete);
+    return { complete, incomplete };
+  }
+
+  function rankBadgeClass(rank){
+    if(rank===1) return 'rank-badge r1';
+    if(rank===2) return 'rank-badge r2';
+    if(rank===3) return 'rank-badge r3';
+    return 'rank-badge';
+  }
+
+  function fmt(n){ return n===null || n===undefined ? '-' : n.toFixed(1); }
+
+  function filteredCandidates(){
+    if(!state.filter.trim()) return state.candidates;
+    const q = state.filter.trim();
+    return state.candidates.filter(c => (c.name||'').includes(q) || (c.examNo||'').includes(q));
+  }
+
+  // ---------- render ----------
+  function el(html){ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; }
+
+  const ROLE_LABELS = { admin:'관리자', A:'면접관 A', B:'면접관 B', C:'면접관 C' };
+
+  function render(){
+    app.innerHTML = '';
+    app.appendChild(renderTop());
+
+    if(!state.loaded){
+      app.appendChild(el(`<div class="card"><div class="empty-state">불러오는 중…</div></div>`));
+      return;
+    }
+
+    if(state.pendingRole){
+      app.appendChild(renderPinGate());
+      return;
+    }
+
+    if(!state.role){
+      app.appendChild(el(`
+        <div class="card">
+          <div class="empty-state">
+            <div class="big">역할을 선택해주세요</div>
+            위 상단의 탭에서 관리자 또는 면접관을 선택하면, 인사팀에서 전달받은 4자리 코드를 입력한 뒤 시작됩니다.
+          </div>
+        </div>`));
+      return;
+    }
+
+    if(state.role === 'admin'){
+      app.appendChild(renderAdmin());
+    } else {
+      app.appendChild(renderInterviewer(state.role));
+    }
+
+    app.appendChild(el(`<div class="footer-note">데이터는 이 페이지를 사용하는 모든 사람과 공유됩니다 · 면접관 점수는 관리자가 공개하기 전까지 서로에게 보이지 않습니다</div>`));
+  }
+
+  function renderPinGate(){
+    const role = state.pendingRole;
+    const card = el(`
+      <div class="card" style="max-width:360px;margin:40px auto;text-align:center;">
+        <div style="font-size:26px;margin-bottom:6px;">🔒</div>
+        <p class="card-title" style="font-size:16px;">${ROLE_LABELS[role]} 코드 입력</p>
+        <p class="card-sub" style="margin-bottom:16px;">인사팀에서 전달받은 4자리 코드를 입력해주세요.</p>
+        <input type="text" inputmode="numeric" maxlength="4" id="pinField"
+          style="font-family:var(--mono);font-size:26px;letter-spacing:.4em;text-align:center;
+          width:180px;padding:10px 0;border-radius:10px;border:1.5px solid var(--line);
+          background:var(--bg);color:var(--ink);" />
+        <div id="pinErrorSlot" style="min-height:20px;margin-top:8px;color:var(--danger);font-size:12.5px;font-weight:600;">${state.pinError ? escapeHtml(state.pinError) : ''}</div>
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;">
+          <button class="btn" id="pinCancelBtn">취소</button>
+          <button class="btn btn-primary" id="pinSubmitBtn">확인</button>
+        </div>
+      </div>`);
+
+    const field = card.querySelector('#pinField');
+    const submit = ()=>{
+      const val = field.value.trim();
+      if(val.length !== 4){
+        state.pinError = '4자리 숫자를 입력해주세요.';
+        render();
+        return;
+      }
+      if(val === state.pins[role]){
+        state.role = role;
+        state.pendingRole = null;
+        state.pinInput = '';
+        state.pinError = '';
+        render();
+      } else {
+        state.pinError = '코드가 올바르지 않습니다.';
+        render();
+      }
+    };
+    field.addEventListener('input', (e)=>{
+      e.target.value = e.target.value.replace(/[^0-9]/g,'').slice(0,4);
+    });
+    field.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') submit(); });
+    card.querySelector('#pinSubmitBtn').addEventListener('click', submit);
+    card.querySelector('#pinCancelBtn').addEventListener('click', ()=>{
+      state.pendingRole = null; state.pinError=''; render();
+    });
+    setTimeout(()=> field.focus(), 0);
+    return card;
+  }
+
+  function renderTop(){
+    const wrap = el(`<div class="topbar">
+      <div>
+        <div class="brand-eyebrow">Interview Scoring</div>
+        <h1>면접 평가 시스템</h1>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="role-tabs" id="roleTabs"></div>
+        ${state.role ? '<button class="btn" id="logoutBtn">로그아웃</button>' : ''}
+      </div>
+    </div>`);
+    const tabs = wrap.querySelector('#roleTabs');
+    const options = [['admin','관리자'], ['A','면접관 A'], ['B','면접관 B'], ['C','면접관 C']];
+    options.forEach(([val,label])=>{
+      const b = el(`<button class="role-tab ${state.role===val?'active':''}">${label}</button>`);
+      b.addEventListener('click', ()=>{
+        if(state.role === val) return; // 이미 해당 역할로 들어와 있음
+        state.pendingRole = val;
+        state.pinInput = '';
+        state.pinError = '';
+        render();
+      });
+      tabs.appendChild(b);
+    });
+    const logoutBtn = wrap.querySelector('#logoutBtn');
+    if(logoutBtn){
+      logoutBtn.addEventListener('click', ()=>{
+        state.role = null;
+        render();
+      });
+    }
+    return wrap;
+  }
+
+  function renderPinSettingsCard(){
+    const card = el(`
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <p class="card-title">접속 코드 관리</p>
+            <p class="card-sub">관리자·면접관 A/B/C 각자에게 나눠줄 4자리 코드입니다. 코드를 바꾼 뒤 해당 담당자에게 새 코드를 알려주세요.</p>
+          </div>
+        </div>
+        <div class="table-wrap" id="pinTableWrap"></div>
+      </div>`);
+    const wrap = card.querySelector('#pinTableWrap');
+    const table = el(`<table><thead><tr><th>역할</th><th>현재 코드</th><th></th></tr></thead><tbody></tbody></table>`);
+    const tbody = table.querySelector('tbody');
+    ['admin','A','B','C'].forEach(role=>{
+      const tr = el(`<tr>
+        <td class="name-cell">${ROLE_LABELS[role]}</td>
+        <td></td>
+        <td></td>
+      </tr>`);
+      const codeInput = el(`<input type="text" inputmode="numeric" maxlength="4"
+        class="filter-input" style="width:100px;font-family:var(--mono);letter-spacing:.15em;"
+        value="${escapeAttr(state.pins[role])}" />`);
+      codeInput.addEventListener('input', (e)=>{
+        e.target.value = e.target.value.replace(/[^0-9]/g,'').slice(0,4);
+      });
+      const saveBtn = el(`<button class="btn btn-teal">저장</button>`);
+      saveBtn.addEventListener('click', ()=> savePin(role, codeInput.value, saveBtn));
+      tr.children[1].appendChild(codeInput);
+      tr.children[2].appendChild(saveBtn);
+      tbody.appendChild(tr);
+    });
+    wrap.appendChild(table);
+    return card;
+  }
+
+  async function savePin(role, value, btnEl){
+    if(value.length !== 4){
+      showToast('코드는 4자리 숫자로 입력해주세요.');
+      return;
+    }
+    const prevLabel = btnEl.textContent;
+    btnEl.textContent = '저장 중…';
+    btnEl.disabled = true;
+    state.pins[role] = value;
+    const ok = await setShared('pins', state.pins);
+    btnEl.disabled = false;
+    btnEl.textContent = prevLabel;
+    if(ok){ showToast(`${ROLE_LABELS[role]} 코드가 변경되었습니다.`); }
+    else{ showToast('코드 저장에 실패했습니다. 다시 시도해주세요.'); }
+  }
+
+  function renderRoundManagementCard(){
+    const viewId = currentRoundId();
+    const activeId = state.activeRoundId;
+    const sortedRounds = [...state.rounds].sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt));
+    const card = el(`
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <p class="card-title">면접 회차 관리</p>
+            <p class="card-sub">회차별로 지원자 명단과 채점 결과가 따로 저장됩니다. 새로운 면접을 시작할 땐 새 회차를 만들어주세요. 지난 회차 데이터는 계속 남아있어 나중에 다시 확인할 수 있습니다.</p>
+          </div>
+          <button class="btn btn-teal" id="newRoundBtn">+ 새 회차 시작</button>
+        </div>
+        ${sortedRounds.length ? '<div id="roundSelectWrap"></div>' : '<div class="empty-state" style="padding:20px 0;">아직 시작된 면접 회차가 없습니다. "새 회차 시작"을 눌러주세요.</div>'}
+      </div>`);
+    card.querySelector('#newRoundBtn').addEventListener('click', createRound);
+    const selectWrap = card.querySelector('#roundSelectWrap');
+    if(selectWrap){
+      const row = el(`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <select class="filter-input" id="roundSelect" style="width:auto;min-width:240px;"></select>
+        <span id="roundBadge"></span>
+        <button class="btn" id="reactivateBtn" style="display:none;">이 회차를 진행중으로 전환</button>
+      </div>`);
+      const select = row.querySelector('#roundSelect');
+      sortedRounds.forEach(r=>{
+        const opt = document.createElement('option');
+        opt.value = r.id;
+        opt.textContent = r.name + (r.id===activeId ? ' (진행중)' : '');
+        if(r.id === viewId) opt.selected = true;
+        select.appendChild(opt);
+      });
+      select.addEventListener('change', (e)=> switchViewRound(e.target.value));
+      const badge = row.querySelector('#roundBadge');
+      const reBtn = row.querySelector('#reactivateBtn');
+      if(viewId === activeId){
+        badge.innerHTML = '<span class="reveal-state on">진행중인 회차</span>';
+      } else {
+        badge.innerHTML = '<span class="reveal-state off">과거 회차 · 읽기 전용</span>';
+        reBtn.style.display = '';
+        reBtn.addEventListener('click', ()=> makeActiveRound(viewId));
+      }
+      selectWrap.appendChild(row);
+    }
+    return card;
+  }
+
+  function renderAdmin(){
+    const wrap = document.createElement('div');
+    wrap.appendChild(renderRoundManagementCard());
+
+    if(state.rounds.length === 0){
+      return wrap; // 회차를 만들기 전에는 나머지 카드는 보여줄 필요가 없음
+    }
+
+    const rid = currentRoundId();
+    const isActive = rid === state.activeRoundId;
+
+    // upload card
+    const uploadCard = el(`
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <p class="card-title">지원자 명단 업로드</p>
+            <p class="card-sub">수험번호, 이름, 생년월일, 성별, 출신대학, 출신학과, 경력 관련 정보가 담긴 엑셀 파일을 올려주세요. (수험번호 열이 없으면 순번으로 자동 부여됩니다)</p>
+          </div>
+          ${(isActive && state.candidates.length) ? '<button class="btn btn-danger" id="resetBtn">이 회차 초기화</button>' : ''}
+        </div>
+        ${isActive ? `
+        <label class="upload-zone">
+          <div class="icon">📄</div>
+          <div class="txt">${state.candidates.length ? '새 엑셀 파일로 다시 업로드' : '엑셀 파일 선택 (.xlsx, .xls)'}</div>
+          <div class="sub">${state.candidates.length ? `현재 ${state.candidates.length}명 등록됨` : '첫 행은 헤더(열 제목)로 인식됩니다'}</div>
+          <input type="file" accept=".xlsx,.xls" id="fileInput" />
+        </label>` : `
+        <div class="banner warn">과거 회차를 보는 중이라 업로드할 수 없습니다. 이 회차에 계속 지원자를 추가하려면 위에서 "이 회차를 진행중으로 전환"을 눌러주세요.</div>
+        `}
+      </div>`);
+    if(isActive){
+      uploadCard.querySelector('#fileInput').addEventListener('change', (e)=>{
+        if(e.target.files[0]) handleFile(e.target.files[0]);
+      });
+      const resetBtn = uploadCard.querySelector('#resetBtn');
+      if(resetBtn) resetBtn.addEventListener('click', resetAll);
+    }
+    wrap.appendChild(uploadCard);
+
+    wrap.appendChild(renderPinSettingsCard());
+
+    if(state.candidates.length === 0){
+      return wrap;
+    }
+
+    // progress card
+    const progressCard = el(`
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <p class="card-title">채점 진행 현황</p>
+            <p class="card-sub">각 면접관이 채점을 완료한 지원자 수 (점수 값은 공개 전까지 관리자에게도 표시되지 않습니다)</p>
+          </div>
+          <div class="toggle-wrap">
+            <span class="reveal-state ${state.revealed?'on':'off'}">${state.revealed ? '전체 공개됨' : '비공개 상태'}</span>
+            <button class="btn ${state.revealed?'':'btn-teal'}" id="revealBtn">${state.revealed ? '공개 취소' : '전체 순위 공개'}</button>
+          </div>
+        </div>
+        <div id="progressBody"></div>
+      </div>`);
+    progressCard.querySelector('#revealBtn').addEventListener('click', toggleReveal);
+    const pbody = progressCard.querySelector('#progressBody');
+    const doneCounts = INTERVIEWERS.map(k => state.candidates.filter(c => ownAvg(k,c.id)!==null).length);
+    pbody.appendChild(el(`
+      <table><thead><tr>
+        <th>면접관 A</th><th>면접관 B</th><th>면접관 C</th><th>전체</th>
+      </tr></thead><tbody><tr>
+        <td>${doneCounts[0]} / ${state.candidates.length}</td>
+        <td>${doneCounts[1]} / ${state.candidates.length}</td>
+        <td>${doneCounts[2]} / ${state.candidates.length}</td>
+        <td>${state.candidates.length}명</td>
+      </tr></tbody></table>`));
+    wrap.appendChild(progressCard);
+
+    // final ranking card (admin can always preview)
+    const finalCard = el(`
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <p class="card-title">최종 순위 미리보기</p>
+            <p class="card-sub">3명 평가가 모두 끝난 지원자만 순위가 매겨집니다 (300점 만점, 면접관별 100점 만점 평균 × 3명 · 동점자는 같은 등수)</p>
+          </div>
+        </div>
+        <div class="table-wrap" id="finalTableWrap"></div>
+      </div>`);
+    finalCard.querySelector('#finalTableWrap').appendChild(buildFinalTable());
+    wrap.appendChild(finalCard);
+
+    return wrap;
+  }
+
+  function buildFinalTable(){
+    const { complete, incomplete } = computeFinal();
+    const rowsHtml = complete.map(r=>{
+      return `<tr>
+        <td><span class="${rankBadgeClass(r.rank)}">${r.rank}</span></td>
+        <td class="mono-cell">${escapeHtml(r.c.examNo||'-')}</td>
+        <td class="name-cell">${escapeHtml(r.c.name)}</td>
+        <td><span class="avg-pill">${fmt(r.per[0])}</span></td>
+        <td><span class="avg-pill">${fmt(r.per[1])}</span></td>
+        <td><span class="avg-pill">${fmt(r.per[2])}</span></td>
+        <td><span class="avg-pill" style="background:var(--ink);color:#fff;">${r.total.toFixed(1)}</span></td>
+      </tr>`;
+    }).join('');
+    const incompleteHtml = incomplete.map(r=>`<tr>
+        <td>-</td>
+        <td class="mono-cell">${escapeHtml(r.c.examNo||'-')}</td>
+        <td class="name-cell">${escapeHtml(r.c.name)}</td>
+        <td colspan="4" class="sub-cell">평가 진행 중 (${r.doneCount}/3명 완료)</td>
+      </tr>`).join('');
+    const table = el(`<table>
+      <thead><tr><th>순위</th><th>수험번호</th><th>이름</th><th>면접관 A</th><th>면접관 B</th><th>면접관 C</th><th>총점 (300점)</th></tr></thead>
+      <tbody>${rowsHtml || ''}${incompleteHtml}</tbody>
+    </table>`);
+    if(!complete.length && !incomplete.length){
+      return el(`<div class="empty-state">등록된 지원자가 없습니다.</div>`);
+    }
+    return table;
+  }
+
+  function renderInterviewer(letter){
+    const wrap = document.createElement('div');
+
+    if(!state.activeRoundId){
+      wrap.appendChild(el(`<div class="card"><div class="empty-state"><div class="big">진행 중인 면접 회차가 없습니다</div>관리자가 새 회차를 시작하면 자동으로 이곳에 표시됩니다.</div></div>`));
+      return wrap;
+    }
+
+    if(state.candidates.length === 0){
+      wrap.appendChild(el(`<div class="card"><div class="empty-state"><div class="big">아직 등록된 지원자가 없습니다</div>관리자가 지원자 명단을 업로드하면 이곳에 표시됩니다.</div></div>`));
+      return wrap;
+    }
+
+    wrap.appendChild(el(`<div class="banner info">
+      🔒 면접관 ${letter}님은 본인이 입력한 점수만 볼 수 있습니다. 다른 면접관의 점수와 순위는 관리자가 <b>전체 순위 공개</b>를 하기 전까지 보이지 않습니다.
+    </div>`));
+
+    const scoreCard = el(`
+      <div class="card" style="margin-top:16px;">
+        <div class="card-head">
+          <div>
+            <p class="card-title">지원자 평가 (면접관 ${letter})</p>
+            <p class="card-sub">직무적합도 · 조직적합도를 각각 등급으로 입력하면 자동으로 환산됩니다 (A=100, B+=95, B=90, C=80, D=70, E=0)</p>
+          </div>
+          <input type="text" class="filter-input" id="filterInput" placeholder="이름 또는 수험번호로 검색" value="${escapeAttr(state.filter)}" />
+        </div>
+        ${renderGradeLegend()}
+        <div class="table-wrap" id="scoreTableWrap"></div>
+      </div>`);
+    scoreCard.querySelector('#filterInput').addEventListener('input', (e)=>{
+      state.filter = e.target.value; render();
+    });
+    scoreCard.querySelector('#scoreTableWrap').appendChild(buildScoreTable(letter));
+    wrap.appendChild(scoreCard);
+
+    // own live ranking
+    const ranking = computeOwnRanking(letter);
+    const rankCard = el(`
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <p class="card-title">나의 실시간 순위</p>
+            <p class="card-sub">내가 채점을 완료한 지원자 중에서의 순위입니다 (총 ${ranking.length}명 완료 / ${state.candidates.length}명)</p>
+          </div>
+        </div>
+        <div class="table-wrap" id="ownRankWrap"></div>
+      </div>`);
+    const ownWrap = rankCard.querySelector('#ownRankWrap');
+    if(ranking.length === 0){
+      ownWrap.appendChild(el(`<div class="empty-state">아직 완료한 평가가 없습니다.</div>`));
+    } else {
+      const rows = ranking.map((r,i)=>`<tr>
+          <td><span class="${rankBadgeClass(r.rank)}">${r.rank}</span></td>
+          <td class="mono-cell">${i+1}</td>
+          <td class="mono-cell">${escapeHtml(r.c.examNo||'-')}</td>
+          <td class="name-cell">${escapeHtml(r.c.name)}</td>
+          <td class="sub-cell">${escapeHtml(r.c.dob||'-')} · ${escapeHtml(r.c.gender||'-')}${r.c.age ? ' · '+escapeHtml(r.c.age) : ''}<br>${escapeHtml(r.c.university||'-')} ${escapeHtml(r.c.department||'')}</td>
+          <td class="exp-cell">${renderCareerCell(r.c)}</td>
+          <td><span class="avg-pill">${fmt(r.avg)}점</span></td>
+        </tr>`).join('');
+      ownWrap.appendChild(el(`<table><thead><tr><th>순위</th><th>순번</th><th>수험번호</th><th>이름</th><th>기본정보</th><th>경력</th><th>평균</th></tr></thead><tbody>${rows}</tbody></table>`));
+    }
+    wrap.appendChild(rankCard);
+
+    // if revealed, show final table too
+    if(state.revealed){
+      const finalCard = el(`
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <p class="card-title">전체 최종 순위 (공개됨)</p>
+              <p class="card-sub">관리자가 전체 결과를 공개했습니다. 3명 면접관 점수를 합산한 순위입니다.</p>
+            </div>
+          </div>
+          <div class="table-wrap" id="finalTableWrap2"></div>
+        </div>`);
+      finalCard.querySelector('#finalTableWrap2').appendChild(buildFinalTable());
+      wrap.appendChild(finalCard);
+    }
+
+    return wrap;
+  }
+
+  function buildScoreTable(letter){
+    const list = filteredCandidates();
+    if(list.length === 0){
+      return el(`<div class="empty-state">검색 결과가 없습니다.</div>`);
+    }
+    const rankMap = computeOwnRankMap(letter);
+    const table = el(`<table>
+      <thead><tr>
+        <th>순번</th><th>수험번호</th><th>이름</th><th>기본 정보</th><th>경력</th><th>직무적합도</th><th>조직적합도</th><th>평균 · 내 등수</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>`);
+    const tbody = table.querySelector('tbody');
+    list.forEach((c, i)=>{
+      const s = state.scores[letter][c.id] || {};
+      const avg = ownAvg(letter, c.id);
+      const rinfo = rankMap[c.id];
+      const avgLabel = avg===null
+        ? '미평가'
+        : `${fmt(avg)}점 · <span class="mono-cell" style="color:inherit;font-weight:700;">${rinfo.rank}/${rinfo.total}등</span>`;
+      const tr = el(`<tr>
+        <td class="mono-cell">${i+1}</td>
+        <td class="mono-cell">${escapeHtml(c.examNo||'-')}</td>
+        <td class="name-cell">${escapeHtml(c.name)}</td>
+        <td class="sub-cell">${escapeHtml(c.dob||'-')} · ${escapeHtml(c.gender||'-')}${c.age ? ' · '+escapeHtml(c.age) : ''}<br>${escapeHtml(c.university||'-')} ${escapeHtml(c.department||'')}</td>
+        <td class="exp-cell">${renderCareerCell(c)}</td>
+        <td></td>
+        <td></td>
+        <td><span class="avg-pill ${avg===null?'empty':''}">${avgLabel}</span></td>
+      </tr>`);
+      const jobTd = tr.children[5];
+      const cultureTd = tr.children[6];
+      jobTd.appendChild(buildGradeSelect(s.job, (grade)=> setScore(letter, c.id, 'job', grade)));
+      cultureTd.appendChild(buildGradeSelect(s.culture, (grade)=> setScore(letter, c.id, 'culture', grade)));
+      tbody.appendChild(tr);
+    });
+    return table;
+  }
+
+  function renderGradeLegend(){
+    const items = Object.entries(GRADE_DEFINITIONS).map(([grade, def])=>{
+      return `<div class="grade-legend-item">
+        <span class="grade-legend-badge">${escapeHtml(grade)}</span>
+        <span class="grade-legend-def">${escapeHtml(def)}</span>
+      </div>`;
+    }).join('');
+    return `<div class="grade-legend">${items}</div>`;
+  }
+
+  function buildGradeSelect(current, onChange){
+    const sel = el(`<select class="grade-select">
+      <option value="">-</option>
+      ${GRADES.map(g=>`<option value="${g}" ${g===current?'selected':''}>${g}</option>`).join('')}
+    </select>`);
+    sel.addEventListener('change', (e)=>{ if(e.target.value) onChange(e.target.value); });
+    return sel;
+  }
+
+  function escapeHtml(s){
+    return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+  function escapeAttr(s){ return escapeHtml(s); }
+
+  // Renders a candidate's structured career list (경력1/경력종류1/경력기간1 …) as clean,
+  // numbered entries instead of one run-on line — most recent (경력1) first.
+  // "중앙일보(2024.06.11~2025.08.09)" 처럼 회사명 칸에 기간이 괄호로 같이 들어있는 경우,
+  // 이름과 기간을 분리해서 종류를 사이에 끼워넣을 수 있도록 한다.
+  function splitCompanyPeriod(raw){
+    const s = String(raw||'').trim();
+    const m = s.match(/^(.*?)[\(（]([^\)）]*)[\)）]\s*$/);
+    if(m) return { name: m[1].trim(), period: m[2].trim() };
+    return { name: s, period: '' };
+  }
+
+  function renderCareerCell(c){
+    const careers = c.careers || [];
+    if(careers.length === 0){
+      return escapeHtml(c.otherInfo || '-');
+    }
+    const items = careers.map((entry, i)=>{
+      const { name, period: embeddedPeriod } = splitCompanyPeriod(entry.company);
+      const period = entry.period || embeddedPeriod;
+      const parts = [];
+      if(name) parts.push(`<b>${escapeHtml(name)}</b>`);
+      if(entry.type) parts.push(escapeHtml(entry.type));
+      const main = parts.join(' ') || '-';
+      const periodTxt = period ? ` <span class="sub-cell">(${escapeHtml(period)})</span>` : '';
+      return `<div class="career-item"><span class="career-idx">${i+1}</span>${main}${periodTxt}</div>`;
+    }).join('');
+    const otherLine = c.otherInfo ? `<div class="sub-cell" style="margin-top:4px;">${escapeHtml(c.otherInfo)}</div>` : '';
+    return items + otherLine;
+  }
+
+  // ---------- boot ----------
+  loadAll();
+  setInterval(loadAll, 3000);
+})();
+</script>
+</body>
+</html>
