@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -7,7 +6,7 @@
 <title>면접 평가 시스템</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <style>
   :root{
     --ink:#16233F;
@@ -100,11 +99,27 @@
   .table-wrap th:first-child, .table-wrap td:first-child{padding-left:14px;}
  
   .name-cell{font-weight:700;}
-  .sub-cell{color:var(--muted);font-size:12px;}
+  .sub-cell{color:var(--muted);font-size:12px;white-space:normal;}
   .mono-cell{font-family:var(--mono);color:var(--slate);font-weight:600;font-size:12.5px;}
-  .exp-cell{color:var(--slate);font-size:12px;}
-  .career-item{display:flex;align-items:baseline;gap:6px;margin-bottom:4px;line-height:1.4;}
+  .exp-cell{color:var(--slate);font-size:12px;white-space:normal;max-width:300px;}
+  .career-item{margin-bottom:8px;line-height:1.4;}
   .career-item:last-child{margin-bottom:0;}
+  .career-item-main{display:flex;align-items:baseline;gap:6px;}
+  .career-item-detail{margin-left:20px;color:var(--muted);font-size:11px;margin-top:1px;}
+ 
+  /* 최종 순위 표: 지원자 1명당 2개 행(기본정보/경력 + 점수)으로 표시해서
+     가로/세로 스크롤 없이 아이패드 화면 안에 들어오도록 함. */
+  .final-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .final-table td{padding:8px 8px;vertical-align:top;white-space:normal;border-bottom:none;}
+  .final-table .name-cell, .final-table .mono-cell{white-space:nowrap;}
+  .final-table tr.final-info-row td{border-top:2px solid var(--line);padding-top:10px;}
+  .final-table tr.final-score-row td{padding-bottom:10px;border-bottom:1px solid var(--line);}
+  .cell-label{
+    font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;
+  }
+  .score-cell{background:var(--bg);border-radius:8px;}
+  .score-cell-grid{display:flex;flex-wrap:wrap;gap:4px 8px;font-family:var(--mono);font-size:11.5px;color:var(--slate);margin-bottom:2px;}
   .career-idx{
     font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--teal);
     background:var(--teal-soft);border-radius:5px;padding:1px 5px;flex-shrink:0;
@@ -232,19 +247,21 @@
     'D': '부합하지 않음',
     'E': '불참석',
   };
-  const INTERVIEWERS = ['A','B','C'];
+  const INTERVIEWERS_ALL = ['A','B','C','D','E']; // 최대 5명까지 지원
  
   let state = {
     role: null,
+    adminSubPage: 'main', // 'main' | 'changelog'
     pendingRole: null,
     pinInput: '',
     pinError: '',
-    pins: { admin:'0000', A:'1111', B:'2222', C:'3333' },
+    pins: { admin:'0000', A:'1111', B:'2222', C:'3333', D:'4444', E:'5555' },
     rounds: [],            // [{id, name, createdAt}] — 지금까지 있었던 모든 면접 회차
     activeRoundId: null,   // 면접관들이 지금 채점하고 있는 회차 (관리자가 지정)
     viewRoundId: null,     // 관리자가 현재 화면에서 들여다보고 있는 회차 (과거 회차 조회 가능)
     candidates: [],
-    scores: { A:{}, B:{}, C:{} },
+    scores: { A:{}, B:{}, C:{}, D:{}, E:{} },
+    interviewerNames: { A:'', B:'', C:'', D:'', E:'' }, // 회차마다 바뀌는 실제 면접관 이름
     revealed: false,
     filter: '',
     loaded: false,
@@ -260,6 +277,17 @@
   //   interviewers see, via viewRoundId.
   function currentRoundId(){
     return state.role === 'admin' ? (state.viewRoundId || state.activeRoundId) : state.activeRoundId;
+  }
+ 
+  // 면접관은 보통 3명이지만 회차에 따라 2~5명일 수 있음. 회차 메타데이터(interviewerCount)에서
+  // 읽어오고, 없거나 잘못된 값이면 기본값 3으로 처리.
+  function getInterviewerCount(roundId){
+    const r = state.rounds.find(x => x.id === roundId);
+    const n = r && r.interviewerCount;
+    return (n >= 2 && n <= 5) ? n : 3;
+  }
+  function activeInterviewerLetters(roundId){
+    return INTERVIEWERS_ALL.slice(0, getInterviewerCount(roundId));
   }
  
   // ---------- storage helpers ----------
@@ -284,6 +312,29 @@
     }catch(e){ return { ok:false }; }
   }
  
+  // Fetches several keys in ONE request instead of one request per key — Apps Script web
+  // apps have noticeable per-request overhead, and issuing many of them (even in parallel)
+  // was the main reason the app felt slow to open. Returns { [key]: {ok, value} }.
+  async function getSharedBatch(keys){
+    const fallback = {};
+    keys.forEach(k => { fallback[k] = { ok:false }; });
+    try{
+      const res = await fetch(`${API_URL}?action=getBatch&keys=${encodeURIComponent(keys.join(','))}&token=${encodeURIComponent(SECRET_TOKEN)}`);
+      const data = await res.json();
+      if(!data.ok || !data.values) return fallback;
+      const out = {};
+      keys.forEach(k=>{
+        if(Object.prototype.hasOwnProperty.call(data.values, k)){
+          try{ out[k] = { ok:true, value: JSON.parse(data.values[k]) }; }
+          catch(e){ out[k] = { ok:false }; }
+        } else {
+          out[k] = { ok:false };
+        }
+      });
+      return out;
+    }catch(e){ return fallback; }
+  }
+ 
   async function setShared(key, value, tries=3){
     for(let i=0;i<tries;i++){
       try{
@@ -303,33 +354,48 @@
     return false;
   }
  
+  // Snapshot of everything that would affect what's on screen, so the 3-second background
+  // sync only triggers a full re-render when something has actually changed. Without this,
+  // every poll rebuilt the entire page from scratch even when nothing was new — which got
+  // noticeably slower as more cards/tables were added over time.
+  let lastRenderSnapshot = null;
+  function takeRenderSnapshot(){
+    return JSON.stringify({
+      role: state.role, pendingRole: state.pendingRole, adminSubPage: state.adminSubPage,
+      rounds: state.rounds, activeRoundId: state.activeRoundId, viewRoundId: state.viewRoundId,
+      candidates: state.candidates, scores: state.scores, revealed: state.revealed,
+      interviewerNames: state.interviewerNames, filter: state.filter, pins: state.pins,
+    });
+  }
+ 
   async function loadAll(){
-    const [roundsRes, activeRes, pins] = await Promise.all([
-      getShared('rounds'),
-      getShared('activeRoundId'),
-      getShared('pins'),
-    ]);
-    if(roundsRes.ok) state.rounds = roundsRes.value || [];
-    if(activeRes.ok) state.activeRoundId = activeRes.value || null;
-    if(pins.ok && pins.value) state.pins = { ...state.pins, ...pins.value };
+    const meta = await getSharedBatch(['rounds', 'activeRoundId', 'pins']);
+    if(meta.rounds.ok) state.rounds = meta.rounds.value || [];
+    if(meta.activeRoundId.ok) state.activeRoundId = meta.activeRoundId.value || null;
+    if(meta.pins.ok && meta.pins.value) state.pins = { ...state.pins, ...meta.pins.value };
     if(!state.viewRoundId) state.viewRoundId = state.activeRoundId;
  
     const rid = currentRoundId();
     if(!rid){
       state.candidates = [];
       state.scores = { A:{}, B:{}, C:{} };
+      state.interviewerNames = { A:'', B:'', C:'' };
       state.revealed = false;
       state.loaded = true;
-      render();
+      const snap = takeRenderSnapshot();
+      if(snap !== lastRenderSnapshot){ lastRenderSnapshot = snap; render(); }
       return;
     }
-    const [cand, sA, sB, sC, rev] = await Promise.all([
-      getShared(roundKey(rid,'candidates')),
-      getShared(roundKey(rid,'scores_A')),
-      getShared(roundKey(rid,'scores_B')),
-      getShared(roundKey(rid,'scores_C')),
-      getShared(roundKey(rid,'revealed')),
+    const scoreKeys = INTERVIEWERS_ALL.map(l => roundKey(rid, 'scores_' + l));
+    const roundData = await getSharedBatch([
+      roundKey(rid,'candidates'),
+      ...scoreKeys,
+      roundKey(rid,'revealed'),
+      roundKey(rid,'interviewerNames'),
     ]);
+    const cand = roundData[roundKey(rid,'candidates')];
+    const rev = roundData[roundKey(rid,'revealed')];
+    const names = roundData[roundKey(rid,'interviewerNames')];
     // Only apply a key if the read actually succeeded — on failure, keep whatever
     // is already showing instead of wiping it out with an empty fallback.
     if(cand.ok) state.candidates = cand.value || [];
@@ -338,12 +404,24 @@
     // already the freshest truth. Overwriting it with a server read risked clobbering a
     // just-made selection before the write had fully landed (the "grade disappears right
     // after picking it" bug). Other interviewers' / admin's own polls are unaffected.
-    if(sA.ok && state.role !== 'A') state.scores.A = sA.value || {};
-    if(sB.ok && state.role !== 'B') state.scores.B = sB.value || {};
-    if(sC.ok && state.role !== 'C') state.scores.C = sC.value || {};
+    INTERVIEWERS_ALL.forEach(letter=>{
+      const s = roundData[roundKey(rid, 'scores_' + letter)];
+      if(s.ok && state.role !== letter) state.scores[letter] = s.value || {};
+    });
     if(rev.ok) state.revealed = !!rev.value;
+    if(names.ok && names.value){
+      const merged = { A:'', B:'', C:'', D:'', E:'', ...names.value };
+      if(INTERVIEWERS_ALL.includes(state.role)){
+        merged[state.role] = state.interviewerNames[state.role]; // 본인이 방금 입력한 이름은 서버값으로 덮어쓰지 않음
+      }
+      state.interviewerNames = merged;
+    }
     state.loaded = true;
-    render();
+    const snap = takeRenderSnapshot();
+    if(snap !== lastRenderSnapshot){
+      lastRenderSnapshot = snap;
+      render();
+    }
   }
  
   // ---------- round management ----------
@@ -351,13 +429,21 @@
     const name = prompt('새 면접 회차의 이름을 입력해주세요 (예: 2026년 상반기 신입 공채 1차)', '');
     if(name === null) return; // 취소
     const finalName = name.trim() || `면접 회차 ${state.rounds.length + 1}`;
+    let interviewerCount = 3;
+    const countStr = prompt('이번 회차의 면접관 수를 입력해주세요 (2~5명, 보통은 3명)', '3');
+    if(countStr !== null){
+      const parsed = parseInt(countStr.trim(), 10);
+      if(!isNaN(parsed) && parsed >= 2 && parsed <= 5) interviewerCount = parsed;
+      else if(countStr.trim() !== '') alert('2~5 사이의 숫자가 아니어서 기본값 3명으로 설정했습니다.');
+    }
     const id = 'r' + Date.now();
-    const round = { id, name: finalName, createdAt: new Date().toISOString() };
+    const round = { id, name: finalName, createdAt: new Date().toISOString(), interviewerCount };
     state.rounds = [...state.rounds, round];
     state.activeRoundId = id;
     state.viewRoundId = id;
     state.candidates = [];
-    state.scores = { A:{}, B:{}, C:{} };
+    state.scores = { A:{}, B:{}, C:{}, D:{}, E:{} };
+    state.interviewerNames = { A:'', B:'', C:'', D:'', E:'' };
     state.revealed = false;
     render();
     await Promise.all([
@@ -367,8 +453,19 @@
       setShared(roundKey(id,'scores_A'), {}),
       setShared(roundKey(id,'scores_B'), {}),
       setShared(roundKey(id,'scores_C'), {}),
+      setShared(roundKey(id,'scores_D'), {}),
+      setShared(roundKey(id,'scores_E'), {}),
       setShared(roundKey(id,'revealed'), false),
+      setShared(roundKey(id,'interviewerNames'), { A:'', B:'', C:'', D:'', E:'' }),
     ]);
+  }
+ 
+  // 면접관 본인의 실제 이름을 이번 회차에 저장. rid를 명시적으로 받아서, 관리자가 과거
+  // 회차를 고쳐 적는 경우와 면접관이 진행 중인 회차에 적는 경우 모두 지원한다.
+  async function setInterviewerName(rid, letter, name){
+    state.interviewerNames[letter] = name;
+    render();
+    await setShared(roundKey(rid, 'interviewerNames'), state.interviewerNames);
   }
  
   async function switchViewRound(id){
@@ -377,35 +474,90 @@
   }
  
   async function makeActiveRound(id){
-    if(!confirm('이 회차를 다시 "진행 중"으로 전환하면, 면접관 A/B/C의 화면이 이 회차 데이터로 바뀝니다. 계속할까요?')) return;
+    if(!confirm('이 회차를 다시 "진행 중"으로 전환하면, 면접관 화면이 이 회차 데이터로 바뀝니다. 계속할까요?')) return;
     state.activeRoundId = id;
     render();
     await setShared('activeRoundId', id);
   }
  
-  // ---------- excel parsing ----------
-  function classifyHeader(h){
-    const s = String(h||'').replace(/\s/g,'');
-    if(/수험번호|접수번호|응시번호/.test(s)) return 'examNo';
-    if(/이름|성명/.test(s)) return 'name';
-    if(/생년월일|생일/.test(s)) return 'dob';
-    if(/성별/.test(s)) return 'gender';
-    if(/학과|전공/.test(s)) return 'department';
-    if(/대학|학교/.test(s)) return 'university';
-    return null;
+  // 회차를 이 웹앱의 회차 목록에서만 제거한다. round:<id>:candidates 등 구글 스프레드시트의
+  // 실제 데이터는 그대로 남아있고, 단지 'rounds' 목록에서 참조가 빠져서 화면에 더 이상
+  // 보이지 않게 될 뿐이다 (필요하면 시트에서 직접 확인 가능).
+  async function deleteRoundFromList(id){
+    const round = state.rounds.find(r => r.id === id);
+    const isActive = id === state.activeRoundId;
+    const warn = isActive
+      ? `"${round ? round.name : ''}"은(는) 현재 진행 중인 회차입니다. 삭제하면 면접관 화면에 "진행 중인 회차 없음"으로 표시됩니다. 그래도 목록에서 삭제할까요? (스프레드시트의 실제 데이터는 삭제되지 않습니다)`
+      : `"${round ? round.name : ''}" 회차를 목록에서 삭제할까요? 스프레드시트의 실제 데이터는 그대로 남고, 이 화면에서만 안 보이게 됩니다.`;
+    if(!confirm(warn)) return;
+ 
+    state.rounds = state.rounds.filter(r => r.id !== id);
+    if(state.activeRoundId === id) state.activeRoundId = null;
+    if(state.viewRoundId === id) state.viewRoundId = state.activeRoundId;
+    render();
+    await Promise.all([
+      setShared('rounds', state.rounds),
+      setShared('activeRoundId', state.activeRoundId),
+    ]);
   }
  
-  // Recognises structured career columns (경력1, 경력종류1, 경력기간1 …) and 나이,
-  // so they can be parsed into a clean per-entry list instead of dumped as raw text.
+  // ---------- excel parsing ----------
+  // 실제 채용시스템(잡코리아 등) 내보내기 파일과, 이전에 쓰던 간단한 테스트 양식을
+  // 둘 다 인식할 수 있도록 헤더 텍스트를 정확 매칭한다. 열의 "위치(순서)"는 매번
+  // 달라질 수 있으므로 절대 위치가 아니라 헤더 문자열로만 판단한다.
+  //
+  // 주의: "대학" 하나로만 판단하면 "대학원"(대학교와 무관한 별도 학력)까지 university로
+  // 잘못 잡히고, "이름" substring 판단은 "영문이름"/"한문이름"까지 걸려버리므로,
+  // 여기서는 정확히 일치하는 헤더 문자열만 화이트리스트로 인정한다.
+  const HEADER_EXACT_MAP = {
+    examNo: ['수험번호','접수번호','응시번호'],
+    name: ['이름','성명'],
+    dob: ['생년월일','생일'],
+    gender: ['성별'],
+    age: ['나이'],
+    university: ['최종졸업대학교명','대학','학교','출신대학'],
+    department: ['최종졸업대학교전공','학과','전공','출신학과'],
+    gradSchool1: ['대학원1-학교명','최종졸업대학원명'],
+    gradMajor1: ['대학원1-전공명','최종졸업대학원전공'],
+    gradDegree1: ['대학원1-학위구분'],
+    gradSchool2: ['대학원2-학교명'],
+    gradMajor2: ['대학원2-전공명'],
+    gradDegree2: ['대학원2-학위구분'],
+    // 실제 채용시스템 내보내기: 경력 여러 건이 한 셀에 줄바꿈(\n)으로 같이 들어있는 형태
+    career_company_multi: ['경력사항-회사명'],
+    career_type_multi: ['경력사항-고용형태'],
+    career_period_multi: ['경력사항-재직일자'],
+    career_department_multi: ['경력사항-부서명'],
+  };
+ 
   function classifyColumn(header){
     const s = String(header||'').replace(/\s/g,'');
-    if(/^나이$/.test(s)) return { type:'age' };
+    for(const type in HEADER_EXACT_MAP){
+      if(HEADER_EXACT_MAP[type].includes(s)) return { type };
+    }
+    // 이전에 쓰던 간단 양식 호환: 경력1 / 경력종류1(=경력1종류) / 경력기간1(=경력1기간)
+    // 처럼 숫자로 여러 경력을 나눠 놓은 형태 (열마다 경력 1건씩)
     let m;
     if((m = s.match(/^경력종류(\d+)$/)) || (m = s.match(/^경력(\d+)종류$/))) return { type:'career_type', idx: parseInt(m[1],10) };
     if((m = s.match(/^경력기간(\d+)$/)) || (m = s.match(/^경력(\d+)기간$/))) return { type:'career_period', idx: parseInt(m[1],10) };
     if((m = s.match(/^경력(\d+)$/))) return { type:'career_company', idx: parseInt(m[1],10) };
-    const basic = classifyHeader(header);
-    return basic ? { type: basic } : null;
+    return null;
+  }
+ 
+  // 첫 몇 줄 중 실제 "헤더 행"이 어디인지 찾는다. 실제 채용시스템 파일은
+  // 1행: 병합된 제목, 2행: 진짜 헤더, 3행: 1,2,3… 열 번호, 4행부터 데이터 — 이렇게
+  // 되어 있어서 무조건 첫 행을 헤더로 보면 안 된다.
+  function findHeaderRowIndex(rows){
+    const limit = Math.min(rows.length, 8);
+    for(let i=0;i<limit;i++){
+      const row = rows[i];
+      const nonEmpty = row.filter(v => String(v).trim() !== '');
+      if(nonEmpty.length < 3) continue; // 셀이 거의 없으면 제목 행일 가능성이 큼
+      const numericRatio = nonEmpty.filter(v => /^\d+$/.test(String(v).trim())).length / nonEmpty.length;
+      if(numericRatio > 0.7) continue; // 1,2,3… 열 번호 행이면 건너뜀
+      return i;
+    }
+    return 0;
   }
  
   function handleFile(file){
@@ -417,27 +569,34 @@
         const sheet = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(sheet, { header:1, defval:'' });
         if(rows.length < 2){ alert('엑셀에 데이터가 없습니다.'); return; }
-        const headers = rows[0];
+ 
+        const headerRowIdx = findHeaderRowIndex(rows);
+        const headers = rows[headerRowIdx];
         const cols = headers.map(classifyColumn);
         const hasName = cols.some(c => c && c.type === 'name');
  
+        // 헤더 다음 행이 1,2,3… 같은 열 번호 행이면 그 행도 건너뛰고 그 다음부터 데이터로 본다.
+        let dataStartIdx = headerRowIdx + 1;
+        const nextRow = rows[dataStartIdx];
+        if(nextRow){
+          const nonEmpty = nextRow.filter(v => String(v).trim() !== '');
+          const numericRatio = nonEmpty.length ? nonEmpty.filter(v => /^\d+$/.test(String(v).trim())).length / nonEmpty.length : 0;
+          if(nonEmpty.length >= 3 && numericRatio > 0.7) dataStartIdx++;
+        }
+ 
         const candidates = [];
         let seq = 0;
-        for(let i=1;i<rows.length;i++){
+        for(let i=dataStartIdx;i<rows.length;i++){
           const row = rows[i];
           if(row.every(c => String(c).trim()==='')) continue;
           seq++;
-          const rec = { examNo:'', name:'', dob:'', gender:'', university:'', department:'', age:'' };
-          const careersMap = {};
-          const extras = [];
+          const rec = { examNo:'', name:'', dob:'', gender:'', university:'', department:'', age:'', gradSchool1:'', gradMajor1:'', gradDegree1:'', gradSchool2:'', gradMajor2:'', gradDegree2:'' };
+          const careersMap = {};       // 이전 간단 양식(경력1, 경력2 …)용
+          const multi = {};            // 실제 채용시스템(한 셀에 \n으로 여러 경력)용
           row.forEach((val, idx)=>{
             const col = cols[idx];
-            const label = headers[idx];
             const valStr = String(val ?? '').trim();
-            if(!col){
-              if(valStr !== '') extras.push(`${label}: ${val}`);
-              return;
-            }
+            if(!col) return; // 화이트리스트에 없는 열은 무시 (요청하신 항목만 사용)
             if(col.type === 'career_company'){
               if(!careersMap[col.idx]) careersMap[col.idx] = {};
               careersMap[col.idx].company = valStr;
@@ -447,18 +606,39 @@
             } else if(col.type === 'career_period'){
               if(!careersMap[col.idx]) careersMap[col.idx] = {};
               careersMap[col.idx].period = valStr;
+            } else if(col.type === 'career_company_multi'){
+              multi.company = valStr ? valStr.split(/\r?\n/) : [];
+            } else if(col.type === 'career_type_multi'){
+              multi.type = valStr ? valStr.split(/\r?\n/) : [];
+            } else if(col.type === 'career_period_multi'){
+              multi.period = valStr ? valStr.split(/\r?\n/) : [];
+            } else if(col.type === 'career_department_multi'){
+              multi.department = valStr ? valStr.split(/\r?\n/) : [];
             } else {
               rec[col.type] = valStr;
             }
           });
           if(!hasName){ rec.name = String(row[0] ?? '').trim(); }
           if(!rec.examNo){ rec.examNo = String(seq).padStart(3,'0'); } // 엑셀에 수험번호 열이 없으면 순번으로 자동 부여
-          // 경력1이 가장 최근 경력이므로 idx 오름차순 = 최신순으로 정렬
-          rec.careers = Object.keys(careersMap)
-            .map(k => ({ idx: parseInt(k,10), ...careersMap[k] }))
-            .filter(c => (c.company && c.company.trim()) || (c.type && c.type.trim()))
-            .sort((a,b) => a.idx - b.idx);
-          rec.otherInfo = extras.join(', '); // 그 외 분류되지 않은 열 (있을 경우에만 참고용으로 표시)
+ 
+          if(multi.company || multi.type || multi.period || multi.department){
+            // 회사명 배열의 길이를 기준으로, 같은 인덱스의 값들을 하나의 경력으로 묶는다
+            // (실제 파일에서 모든 경력 하위 열의 항목 수가 항상 일치함을 확인함).
+            const n = (multi.company || []).length;
+            rec.careers = Array.from({ length: n }, (_, idx) => ({
+              idx,
+              company: (multi.company && multi.company[idx]) || '',
+              type: (multi.type && multi.type[idx]) || '',
+              period: (multi.period && multi.period[idx]) || '',
+              department: (multi.department && multi.department[idx]) || '',
+            })).filter(c => !isBlankValue(c.company) || !isBlankValue(c.type));
+          } else {
+            // 경력1이 가장 최근 경력이므로 idx 오름차순 = 최신순으로 정렬
+            rec.careers = Object.keys(careersMap)
+              .map(k => ({ idx: parseInt(k,10), ...careersMap[k] }))
+              .filter(c => !isBlankValue(c.company) || !isBlankValue(c.type))
+              .sort((a,b) => a.idx - b.idx);
+          }
           rec.id = 'c' + i + '_' + (rec.name||'').replace(/\s/g,'').slice(0,6) + '_' + Math.random().toString(36).slice(2,6);
           candidates.push(rec);
         }
@@ -486,13 +666,15 @@
     if(!confirm('이번 회차의 모든 지원자 정보와 채점 결과, 공개 상태가 초기화됩니다. 계속할까요?')) return;
     const rid = currentRoundId();
     state.candidates = [];
-    state.scores = { A:{}, B:{}, C:{} };
+    state.scores = { A:{}, B:{}, C:{}, D:{}, E:{} };
     state.revealed = false;
     await Promise.all([
       setShared(roundKey(rid,'candidates'), []),
       setShared(roundKey(rid,'scores_A'), {}),
       setShared(roundKey(rid,'scores_B'), {}),
       setShared(roundKey(rid,'scores_C'), {}),
+      setShared(roundKey(rid,'scores_D'), {}),
+      setShared(roundKey(rid,'scores_E'), {}),
       setShared(roundKey(rid,'revealed'), false),
     ]);
     render();
@@ -572,11 +754,30 @@
   }
  
   function computeFinal(){
+    const letters = activeInterviewerLetters(currentRoundId());
     const all = state.candidates.map(c=>{
-      const per = INTERVIEWERS.map(k => ownAvg(k, c.id));
+      const per = letters.map(k => ownAvg(k, c.id));
+      const jobs = letters.map(k => {
+        const s = state.scores[k][c.id];
+        return (s && s.job) ? GRADE_MAP[s.job] : null;
+      });
+      const cultures = letters.map(k => {
+        const s = state.scores[k][c.id];
+        return (s && s.culture) ? GRADE_MAP[s.culture] : null;
+      });
+      const jobGrades = letters.map(k => {
+        const s = state.scores[k][c.id];
+        return (s && s.job) ? s.job : null;
+      });
+      const cultureGrades = letters.map(k => {
+        const s = state.scores[k][c.id];
+        return (s && s.culture) ? s.culture : null;
+      });
       const doneCount = per.filter(v=>v!==null).length;
       const total = per.reduce((a,b)=> a + (b||0), 0);
-      return { c, per, total, complete: doneCount===3, doneCount };
+      const jobTotal = jobs.reduce((a,b)=> a + (b||0), 0);
+      const cultureTotal = cultures.reduce((a,b)=> a + (b||0), 0);
+      return { c, per, jobs, cultures, jobGrades, cultureGrades, total, jobTotal, cultureTotal, complete: doneCount===letters.length, doneCount };
     }).sort((a,b)=> b.total - a.total);
     const complete = assignStandardRanks(all.filter(r=>r.complete), r => r.total);
     const incomplete = all.filter(r=>!r.complete);
@@ -601,9 +802,170 @@
   // ---------- render ----------
   function el(html){ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; }
  
-  const ROLE_LABELS = { admin:'관리자', A:'면접관 A', B:'면접관 B', C:'면접관 C' };
+  const ROLE_LABELS = { admin:'관리자', A:'면접관 A', B:'면접관 B', C:'면접관 C', D:'면접관 D', E:'면접관 E' };
  
+  // 관리자 전용 "개발 기록" — 이 프로그램에 어떤 기능이 언제 추가/수정/제거되었는지 기록.
+  // 새 기능을 추가하거나 고칠 때마다, 맨 위에 새 날짜 항목을 추가해주세요 (최신순).
+  // 관리자 전용 "개발 기록" — 날짜 대신, 실제로 요청·수정된 순서 그대로 "업데이트 1, 2, 3…"
+  // 형식으로 기록. 이 시스템이 대화가 진행되며 어떻게 변화해왔는지를 시간순으로 보여주는 게
+  // 목적이므로, 새 기능/수정이 생길 때마다 맨 아래에 새 업데이트 항목을 추가해주세요.
+  const CHANGELOG = [
+    {
+      label: '업데이트 1 · 최초 버전',
+      items: [
+        { type:'추가', text:'엑셀 업로드로 지원자 명단(수험번호/이름/기본정보/경력) 등록' },
+        { type:'추가', text:'면접관별 비공개 채점 칸(직무적합도/조직적합도), 자동 평균 계산' },
+        { type:'추가', text:'면접관 본인이 채점한 지원자들 사이에서의 실시간 개인 등수' },
+        { type:'추가', text:'관리자의 "전체 순위 공개" 기능 및 공개 전까지 서로 점수 비공개' },
+      ],
+    },
+    {
+      label: '업데이트 2 · 등급 체계 변경',
+      items: [
+        { type:'수정', text:'등급 체계를 A/B+/B/C/D/E, 100점 만점 방식으로 변경' },
+        { type:'추가', text:'등급별 기준(정의) 범례 표시 (예: A=기대수준 이상, E=불참석)' },
+      ],
+    },
+    {
+      label: '업데이트 3 · 저장 안정성 및 정보 표시 개선',
+      items: [
+        { type:'수정', text:'업로드 직후 데이터가 사라지는 저장 오류 수정' },
+        { type:'추가', text:'수험번호 자동 인식/부여 및 각 표에 표시' },
+        { type:'추가', text:'경력1/경력종류1/경력기간1 등 구조화된 열을 인식해 "회사명 종류 (기간)" 형태로 정리 표시' },
+        { type:'수정', text:'저장 성공/실패 오탐으로 계속 뜨던 알림을 조용한 재시도 방식으로 변경' },
+        { type:'추가', text:'채점표에 지원자별 실시간 등수(X/N등)를 직접 표시' },
+      ],
+    },
+    {
+      label: '업데이트 4 · 접근 제한 및 동점자 처리',
+      items: [
+        { type:'추가', text:'관리자/면접관 A·B·C 역할별 4자리 코드 로그인' },
+        { type:'추가', text:'관리자 화면에서 각 역할의 접속 코드 변경 기능' },
+        { type:'추가', text:'동점자 동일 등수 처리 (1-2-2-4 방식)' },
+        { type:'추가', text:'채점표/개인 순위표 맨 앞에 순번(1,2,3…) 열 추가' },
+      ],
+    },
+    {
+      label: '업데이트 5 · 면접 회차 관리 및 구글 스프레드시트 연동',
+      items: [
+        { type:'추가', text:'면접 회차별로 지원자 명단·채점 결과를 분리 저장, 과거 회차 조회/재개 기능' },
+        { type:'추가', text:'구글 스프레드시트 + Apps Script를 데이터 저장소로 연동해 여러 기기 간 실시간 동기화' },
+        { type:'추가', text:'API 요청에 보안 토큰을 추가해 URL만으로는 접근 불가하도록 보호' },
+      ],
+    },
+    {
+      label: '업데이트 6 · 모바일/태블릿 화면 대응',
+      items: [
+        { type:'수정', text:'좁은 화면에서 글자가 한 글자씩 세로로 깨지는 표시 오류 수정' },
+        { type:'추가', text:'화면이 좁을 때 표가 카드형 목록으로 전환되는 반응형 레이아웃 적용' },
+      ],
+    },
+    {
+      label: '업데이트 7 · 면접관 실명 및 입력창 버그 근본 수정',
+      items: [
+        { type:'추가', text:'면접관 본인 실명을 회차별로 입력/저장하고 결과에 함께 표시' },
+        { type:'수정', text:'자동 새로고침이 타이핑 중인 입력창을 초기화하던 문제를 근본적으로 수정 (한글 입력 불가·글자 수 제한 현상 포함, 모든 입력창에 적용)' },
+      ],
+    },
+    {
+      label: '업데이트 8 · 개발 기록 및 엑셀 다운로드',
+      items: [
+        { type:'추가', text:'관리자 전용 개발 기록 화면 (하위 페이지로 분리, 평소엔 숨김)' },
+        { type:'추가', text:'최종 순위를 엑셀(.xlsx) 파일로 다운로드하는 기능' },
+      ],
+    },
+    {
+      label: '업데이트 9 · 최종 순위 표 개편',
+      items: [
+        { type:'수정', text:'최종 순위에 면접관별 조직적합도·직무적합도·소계를 세분화해서 표시 (기존엔 종합점수만 보임)' },
+        { type:'추가', text:'최종 순위 표에 지원자 기본정보·경력을 함께 표시' },
+        { type:'수정', text:'지원자 1명당 2개 행(기본정보/경력 + 점수) 구조로 재구성해 가로 스크롤 없이 표시' },
+        { type:'수정', text:'조직/직무적합도 점수를 숫자만이 아니라 등급 문자와 함께 표시 (예: 조직 B+(95))' },
+      ],
+    },
+    {
+      label: '업데이트 10 · 속도 개선',
+      items: [
+        { type:'수정', text:'3초 자동 동기화가 실제 변경사항이 있을 때만 화면을 다시 그리도록 개선' },
+        { type:'수정', text:'초기 로딩 시 구글시트 조회를 9번의 개별 요청 → 2번의 일괄 요청으로 축소 (Apps Script에 getBatch 추가)' },
+        { type:'수정', text:'엑셀 라이브러리를 지연 로딩(defer)으로 변경' },
+      ],
+    },
+    {
+      label: '업데이트 11 · 회차 확인 및 기록 정리',
+      items: [
+        { type:'추가', text:'면접관 화면에 현재 진행 중인 회차 이름을 읽기 전용으로 표시 (회차 변경은 관리자만 가능)' },
+        { type:'수정', text:'개발 기록을 날짜 대신 실제 업데이트 순서(1, 2, 3…) 기준으로 재구성' },
+      ],
+    },
+    {
+      label: '업데이트 12 · 면접관 수 유연화',
+      items: [
+        { type:'수정', text:'면접관 수를 3명 고정에서 회차마다 2~5명까지 선택 가능하도록 변경 (새 회차 시작 시 인원 수 입력)' },
+        { type:'수정', text:'역할 로그인 탭, 채점표, 최종 순위, 엑셀 다운로드, 진행 현황 등 전체 화면이 회차별 면접관 수에 맞춰 자동으로 조정되도록 개선' },
+      ],
+    },
+    {
+      label: '업데이트 13 · 회차 목록 삭제',
+      items: [
+        { type:'추가', text:'테스트 등으로 만든 회차를 앱 목록에서만 삭제하는 기능 추가 (구글 스프레드시트의 실제 데이터는 삭제되지 않음)' },
+      ],
+    },
+    {
+      label: '업데이트 14 · 실제 채용시스템 원본 파일 직접 인식',
+      items: [
+        { type:'수정', text:'전처리 없이 채용시스템에서 바로 다운로드한 원본 엑셀을 그대로 업로드할 수 있도록 열 인식 방식을 정확 매칭으로 전면 재작성 (열 순서가 매번 달라도 헤더 문자열로 인식)' },
+        { type:'추가', text:'제목행/열번호행이 섞여 있는 실제 파일 구조를 감지해 진짜 헤더 행을 자동으로 찾는 로직 추가' },
+        { type:'추가', text:'경력 여러 건이 한 셀에 줄바꿈으로 같이 들어있는 실제 채용시스템 형식(경력사항-고용형태/회사명/재직일자/부서명) 지원' },
+        { type:'추가', text:'최종졸업 대학원명/전공(석·박사)을 인식해 대학교 정보 아래에 함께 표시' },
+        { type:'수정', text:'경력/학력 정보가 없을 때 "-"가 실제 값처럼 잘못 표시되던 문제 수정' },
+      ],
+    },
+    {
+      label: '업데이트 15 · 기본정보·경력 표시 형식 정리',
+      items: [
+        { type:'수정', text:'경력 표시를 회사명 / 부서·고용형태 / 재직기간 3줄 고정 형식으로 재구성 (긴 회사명이 글자 단위로 깨지던 문제 해결)' },
+        { type:'수정', text:'기본정보를 생년월일·성별·나이 / (학사) 대학교·전공·복수전공 / (석사·박사) 대학원·전공 구조로 재구성, 구간 사이 여백 추가' },
+        { type:'수정', text:'최종 순위 표에서 기본정보와 경력 칸의 가로 폭을 5:5로 고정' },
+        { type:'수정', text:'대학원 정보를 "대학원1"/"대학원2" 열로 각각 인식해, 석사·박사를 실제 학위구분 값에 맞게 따로 표시하도록 개선' },
+      ],
+    },
+  ];
+ 
+  // Wrapper around the real render so that whatever text input the user is actively
+  // typing into — the interviewer name field, the search box, a PIN code field, admin
+  // name/code inputs, etc. — never gets interrupted or reset by a re-render, whether
+  // that render was triggered by the 3-second background sync or by any other action.
+  // This was the root cause behind "Korean won't type" / "input cuts off after a few
+  // characters": a full-page rebuild was recreating the input mid-keystroke (or mid-IME
+  // composition) with its old, unsaved value.
   function render(){
+    const active = document.activeElement;
+    let restore = null;
+    if(active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') && active.id){
+      restore = {
+        id: active.id,
+        value: active.value,
+        selStart: active.selectionStart,
+        selEnd: active.selectionEnd,
+      };
+    }
+    renderInner();
+    if(restore){
+      const revived = document.getElementById(restore.id);
+      if(revived && (revived.tagName === 'INPUT' || revived.tagName === 'TEXTAREA')){
+        revived.value = restore.value;
+        revived.focus();
+        try{ revived.setSelectionRange(restore.selStart, restore.selEnd); }catch(e){}
+      }
+    }
+    // Keep the background-poll dirty-check in sync with whatever just got rendered
+    // (whether triggered by a direct user action or by loadAll), so the next poll only
+    // re-renders if something has genuinely changed since this point.
+    lastRenderSnapshot = takeRenderSnapshot();
+  }
+ 
+  function renderInner(){
     app.innerHTML = '';
     app.appendChild(renderTop());
  
@@ -698,7 +1060,8 @@
       </div>
     </div>`);
     const tabs = wrap.querySelector('#roleTabs');
-    const options = [['admin','관리자'], ['A','면접관 A'], ['B','면접관 B'], ['C','면접관 C']];
+    const activeLetters = activeInterviewerLetters(state.activeRoundId);
+    const options = [['admin','관리자'], ...activeLetters.map(l => [l, `면접관 ${l}`])];
     options.forEach(([val,label])=>{
       const b = el(`<button class="role-tab ${state.role===val?'active':''}">${label}</button>`);
       b.addEventListener('click', ()=>{
@@ -726,7 +1089,7 @@
         <div class="card-head">
           <div>
             <p class="card-title">접속 코드 관리</p>
-            <p class="card-sub">관리자·면접관 A/B/C 각자에게 나눠줄 4자리 코드입니다. 코드를 바꾼 뒤 해당 담당자에게 새 코드를 알려주세요.</p>
+            <p class="card-sub">관리자·면접관 A~E 각자에게 나눠줄 4자리 코드입니다 (면접관 수는 보통 3명이지만, 회차마다 2~5명까지 다를 수 있어 미리 다 준비해뒀어요). 코드를 바꾼 뒤 해당 담당자에게 새 코드를 알려주세요.</p>
           </div>
         </div>
         <div class="table-wrap" id="pinTableWrap"></div>
@@ -734,13 +1097,13 @@
     const wrap = card.querySelector('#pinTableWrap');
     const table = el(`<table><thead><tr><th>역할</th><th>현재 코드</th><th></th></tr></thead><tbody></tbody></table>`);
     const tbody = table.querySelector('tbody');
-    ['admin','A','B','C'].forEach(role=>{
+    ['admin','A','B','C','D','E'].forEach(role=>{
       const tr = el(`<tr>
         <td class="name-cell">${ROLE_LABELS[role]}</td>
         <td></td>
         <td></td>
       </tr>`);
-      const codeInput = el(`<input type="text" inputmode="numeric" maxlength="4"
+      const codeInput = el(`<input type="text" inputmode="numeric" maxlength="4" id="pinCodeInput_${role}"
         class="filter-input" style="width:100px;font-family:var(--mono);letter-spacing:.15em;"
         value="${escapeAttr(state.pins[role])}" />`);
       codeInput.addEventListener('input', (e)=>{
@@ -781,7 +1144,7 @@
         <div class="card-head">
           <div>
             <p class="card-title">면접 회차 관리</p>
-            <p class="card-sub">회차별로 지원자 명단과 채점 결과가 따로 저장됩니다. 새로운 면접을 시작할 땐 새 회차를 만들어주세요. 지난 회차 데이터는 계속 남아있어 나중에 다시 확인할 수 있습니다.</p>
+            <p class="card-sub">회차별로 지원자 명단과 채점 결과가 따로 저장됩니다. 새로운 면접을 시작할 땐 새 회차를 만들어주세요. 지난 회차 데이터는 계속 남아있어 나중에 다시 확인할 수 있고, 헷갈리는 테스트 회차는 목록에서만 지울 수 있습니다 (스프레드시트의 실제 데이터는 남아있어요).</p>
           </div>
           <button class="btn btn-teal" id="newRoundBtn">+ 새 회차 시작</button>
         </div>
@@ -794,16 +1157,18 @@
         <select class="filter-input" id="roundSelect" style="width:auto;min-width:240px;"></select>
         <span id="roundBadge"></span>
         <button class="btn" id="reactivateBtn" style="display:none;">이 회차를 진행중으로 전환</button>
+        <button class="btn btn-danger" id="deleteRoundBtn">🗑 이 회차 목록에서 삭제</button>
       </div>`);
       const select = row.querySelector('#roundSelect');
       sortedRounds.forEach(r=>{
         const opt = document.createElement('option');
         opt.value = r.id;
-        opt.textContent = r.name + (r.id===activeId ? ' (진행중)' : '');
+        opt.textContent = r.name + ` · 면접관 ${r.interviewerCount||3}명` + (r.id===activeId ? ' (진행중)' : '');
         if(r.id === viewId) opt.selected = true;
         select.appendChild(opt);
       });
       select.addEventListener('change', (e)=> switchViewRound(e.target.value));
+      row.querySelector('#deleteRoundBtn').addEventListener('click', ()=> deleteRoundFromList(viewId));
       const badge = row.querySelector('#roundBadge');
       const reBtn = row.querySelector('#reactivateBtn');
       if(viewId === activeId){
@@ -818,9 +1183,52 @@
     return card;
   }
  
+  function renderChangelogCard(){
+    const badge = { '추가':'var(--teal)', '수정':'var(--amber)', '제거':'var(--danger)' };
+    const entries = CHANGELOG.map(entry => {
+      const rows = entry.items.map(it => `
+        <div style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;">
+          <span style="flex-shrink:0;font-family:var(--mono);font-size:10.5px;font-weight:700;color:#fff;background:${badge[it.type]||'var(--muted)'};border-radius:6px;padding:2px 7px;">${escapeHtml(it.type)}</span>
+          <span style="font-size:13px;color:var(--slate);">${escapeHtml(it.text)}</span>
+        </div>`).join('');
+      return `<div style="margin-bottom:16px;padding-left:10px;border-left:2px solid var(--line);">
+        <div style="font-size:12.5px;font-weight:700;color:var(--ink);margin-bottom:4px;">${escapeHtml(entry.label)}</div>
+        ${rows}
+      </div>`;
+    }).join('');
+    const card = el(`
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <p class="card-title">개발 기록</p>
+            <p class="card-sub">이 시스템이 요청·수정된 순서대로 어떻게 변화해왔는지 기록됩니다 (오래된 순). 관리자만 볼 수 있고, 필요할 때 참고하거나 인사팀에 공유하는 용도예요.</p>
+          </div>
+          <button class="btn" id="backFromChangelogBtn">← 관리자 화면으로</button>
+        </div>
+        ${entries}
+      </div>`);
+    card.querySelector('#backFromChangelogBtn').addEventListener('click', ()=>{
+      state.adminSubPage = 'main'; render();
+    });
+    return card;
+  }
+ 
   function renderAdmin(){
+    if(state.adminSubPage === 'changelog'){
+      const wrap = document.createElement('div');
+      wrap.appendChild(renderChangelogCard());
+      return wrap;
+    }
+ 
     const wrap = document.createElement('div');
     wrap.appendChild(renderRoundManagementCard());
+    wrap.appendChild(el(`
+      <div style="text-align:right;margin:-6px 0 16px;">
+        <button class="btn" id="openChangelogBtn" style="font-size:12px;color:var(--muted);">📋 개발 기록 보기</button>
+      </div>`));
+    wrap.querySelector('#openChangelogBtn').addEventListener('click', ()=>{
+      state.adminSubPage = 'changelog'; render();
+    });
  
     if(state.rounds.length === 0){
       return wrap; // 회차를 만들기 전에는 나머지 카드는 보여줄 필요가 없음
@@ -869,8 +1277,8 @@
       <div class="card">
         <div class="card-head">
           <div>
-            <p class="card-title">채점 진행 현황</p>
-            <p class="card-sub">각 면접관이 채점을 완료한 지원자 수 (점수 값은 공개 전까지 관리자에게도 표시되지 않습니다)</p>
+            <p class="card-title">채점 진행 현황 · 면접관 이름</p>
+            <p class="card-sub">각 면접관이 채점을 완료한 지원자 수 (점수 값은 공개 전까지 관리자에게도 표시되지 않습니다). 면접관 이름은 본인 화면에서도 입력할 수 있고, 여기서 관리자가 직접 고쳐 적을 수도 있습니다.</p>
           </div>
           <div class="toggle-wrap">
             <span class="reveal-state ${state.revealed?'on':'off'}">${state.revealed ? '전체 공개됨' : '비공개 상태'}</span>
@@ -881,56 +1289,168 @@
       </div>`);
     progressCard.querySelector('#revealBtn').addEventListener('click', toggleReveal);
     const pbody = progressCard.querySelector('#progressBody');
-    const doneCounts = INTERVIEWERS.map(k => state.candidates.filter(c => ownAvg(k,c.id)!==null).length);
-    pbody.appendChild(el(`
-      <table><thead><tr>
-        <th>면접관 A</th><th>면접관 B</th><th>면접관 C</th><th>전체</th>
-      </tr></thead><tbody><tr>
-        <td>${doneCounts[0]} / ${state.candidates.length}</td>
-        <td>${doneCounts[1]} / ${state.candidates.length}</td>
-        <td>${doneCounts[2]} / ${state.candidates.length}</td>
-        <td>${state.candidates.length}명</td>
-      </tr></tbody></table>`));
+    const roundLetters = activeInterviewerLetters(rid);
+    const doneCounts = roundLetters.map(k => state.candidates.filter(c => ownAvg(k,c.id)!==null).length);
+    const progressTable = el(`
+      <table class="responsive-table"><thead><tr>
+        <th>역할</th><th>이름</th><th>채점 완료</th>
+      </tr></thead><tbody></tbody></table>`);
+    const ptbody = progressTable.querySelector('tbody');
+    roundLetters.forEach((k, i)=>{
+      const tr = el(`<tr>
+        <td data-label="역할" class="name-cell">면접관 ${k}</td>
+        <td data-label="이름"></td>
+        <td data-label="채점 완료">${doneCounts[i]} / ${state.candidates.length}명</td>
+      </tr>`);
+      const nameTd = tr.children[1];
+      const nameInput = el(`<input type="text" class="filter-input" id="progressNameInput_${k}" placeholder="이름 입력" value="${escapeAttr(state.interviewerNames[k]||'')}" style="width:140px;" />`);
+      nameInput.addEventListener('change', ()=> setInterviewerName(rid, k, nameInput.value.trim()));
+      nameTd.appendChild(nameInput);
+      ptbody.appendChild(tr);
+    });
+    pbody.appendChild(progressTable);
     wrap.appendChild(progressCard);
  
     // final ranking card (admin can always preview)
+    const roundInterviewerCount = roundLetters.length;
     const finalCard = el(`
       <div class="card">
         <div class="card-head">
           <div>
             <p class="card-title">최종 순위 미리보기</p>
-            <p class="card-sub">3명 평가가 모두 끝난 지원자만 순위가 매겨집니다 (300점 만점, 면접관별 100점 만점 평균 × 3명 · 동점자는 같은 등수)</p>
+            <p class="card-sub">${roundInterviewerCount}명 평가가 모두 끝난 지원자만 순위가 매겨집니다 (${roundInterviewerCount*100}점 만점, 면접관별 100점 만점 평균 × ${roundInterviewerCount}명 · 동점자는 같은 등수)</p>
           </div>
+          <button class="btn btn-teal" id="exportExcelBtn">📥 엑셀로 다운로드</button>
         </div>
         <div class="table-wrap" id="finalTableWrap"></div>
       </div>`);
     finalCard.querySelector('#finalTableWrap').appendChild(buildFinalTable());
+    finalCard.querySelector('#exportExcelBtn').addEventListener('click', exportFinalResultsToExcel);
     wrap.appendChild(finalCard);
  
     return wrap;
   }
  
+  function interviewerLabel(letter){
+    const name = state.interviewerNames[letter];
+    return name ? `면접관 ${letter} · ${name}` : `면접관 ${letter}`;
+  }
+ 
+  // 경력 목록을 엑셀 셀 하나에 넣기 좋은 한 줄 텍스트로 변환 (예: "1. 삼성전자 계약직 (2024.01~2024.12) / 2. ...")
+  function careerToText(c){
+    const careers = c.careers || [];
+    if(careers.length === 0) return c.otherInfo || '';
+    return careers.map((entry, i)=>{
+      const { name, period: embeddedPeriod } = splitCompanyPeriod(entry.company);
+      const period = entry.period || embeddedPeriod;
+      const parts = [name, entry.type].filter(Boolean).join(' ');
+      return `${i+1}. ${parts}${period ? ' ('+period+')' : ''}`;
+    }).join(' / ');
+  }
+ 
+  function exportFinalResultsToExcel(){
+    const { complete, incomplete } = computeFinal();
+    const letters = activeInterviewerLetters(currentRoundId());
+    const labels = letters.map(l => interviewerLabel(l));
+    const maxScore = letters.length * 100;
+    const scoreTotalKey = `종합점수(${maxScore}점)`;
+ 
+    function baseFields(c){
+      return {
+        '수험번호': c.examNo || '',
+        '이름': c.name || '',
+        '생년월일': c.dob || '',
+        '성별': c.gender || '',
+        '나이': c.age || '',
+        '출신대학': c.university || '',
+        '출신학과': c.department || '',
+        '경력': careerToText(c),
+      };
+    }
+ 
+    const rows = complete.map(r => {
+      const row = { '순위': r.rank, ...baseFields(r.c) };
+      labels.forEach((label, i)=>{
+        row[`${label} 조직적합도`] = r.cultures[i]!=null ? r.cultures[i] : '';
+        row[`${label} 직무적합도`] = r.jobs[i]!=null ? r.jobs[i] : '';
+        row[`${label} 소계`] = r.per[i]!=null ? r.per[i] : '';
+      });
+      row[scoreTotalKey] = r.total;
+      return row;
+    });
+    incomplete.forEach(r=>{
+      const row = { '순위': '-', ...baseFields(r.c) };
+      labels.forEach(label=>{
+        row[`${label} 조직적합도`] = '';
+        row[`${label} 직무적합도`] = '';
+        row[`${label} 소계`] = '';
+      });
+      row[scoreTotalKey] = `평가 진행 중 (${r.doneCount}/${letters.length}명 완료)`;
+      rows.push(row);
+    });
+    if(rows.length === 0){
+      alert('내보낼 지원자 데이터가 없습니다.');
+      return;
+    }
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '최종순위');
+    const roundName = (state.rounds.find(rd => rd.id === currentRoundId()) || {}).name || '면접결과';
+    const safeName = roundName.replace(/[\\/:*?"<>|]/g, '_');
+    XLSX.writeFile(wb, `${safeName}_최종순위.xlsx`);
+  }
+ 
   function buildFinalTable(){
     const { complete, incomplete } = computeFinal();
+    const letters = activeInterviewerLetters(currentRoundId());
+    const labels = letters.map(l => interviewerLabel(l));
+    const maxScore = letters.length * 100;
+ 
+    function basicInfoCell(c){
+      return renderBasicInfoHtml(c);
+    }
+ 
+    function scoreCell(label, culture, cultureGrade, job, jobGrade, subtotal){
+      return `<td class="score-cell">
+        <div class="cell-label">${escapeAttr(label)}</div>
+        <div class="score-cell-grid">
+          <span title="조직적합도">조직 ${cultureGrade!=null ? escapeHtml(cultureGrade)+'('+culture+')' : '-'}</span>
+          <span title="직무적합도">직무 ${jobGrade!=null ? escapeHtml(jobGrade)+'('+job+')' : '-'}</span>
+        </div>
+        <span class="avg-pill" style="margin-top:3px;display:inline-block;">${subtotal!=null ? fmt(subtotal)+'점' : '평가중'}</span>
+      </td>`;
+    }
+ 
     const rowsHtml = complete.map(r=>{
-      return `<tr>
-        <td data-label="순위"><span class="${rankBadgeClass(r.rank)}">${r.rank}</span></td>
-        <td class="mono-cell" data-label="수험번호">${escapeHtml(r.c.examNo||'-')}</td>
-        <td class="name-cell" data-label="이름">${escapeHtml(r.c.name)}</td>
-        <td data-label="면접관 A"><span class="avg-pill">${fmt(r.per[0])}</span></td>
-        <td data-label="면접관 B"><span class="avg-pill">${fmt(r.per[1])}</span></td>
-        <td data-label="면접관 C"><span class="avg-pill">${fmt(r.per[2])}</span></td>
-        <td data-label="총점 (300점)"><span class="avg-pill" style="background:var(--ink);color:#fff;">${r.total.toFixed(1)}</span></td>
+      const infoRow = `<tr class="final-info-row">
+        <td rowspan="2"><div class="cell-label">순위</div><span class="${rankBadgeClass(r.rank)}">${r.rank}</span></td>
+        <td rowspan="2" class="mono-cell"><div class="cell-label">수험번호</div>${escapeHtml(r.c.examNo||'-')}</td>
+        <td rowspan="2" class="name-cell"><div class="cell-label">이름</div>${escapeHtml(r.c.name)}</td>
+        <td class="sub-cell" colspan="3" style="width:50%;"><div class="cell-label">기본정보</div>${basicInfoCell(r.c)}</td>
+        <td class="exp-cell" colspan="3" style="width:50%;"><div class="cell-label">경력</div>${renderCareerCell(r.c)}</td>
       </tr>`;
+      const scoreCells = letters.map((l, i) =>
+        scoreCell(labels[i], r.cultures[i], r.cultureGrades[i], r.jobs[i], r.jobGrades[i], r.per[i])
+      ).join('');
+      const scoreRow = `<tr class="final-score-row">
+        ${scoreCells}
+        <td class="score-cell">
+          <div class="cell-label">종합점수 (${maxScore}점)</div>
+          <span class="avg-pill" style="background:var(--ink);color:#fff;font-size:14px;">${r.total.toFixed(1)}</span>
+        </td>
+      </tr>`;
+      return infoRow + scoreRow;
     }).join('');
-    const incompleteHtml = incomplete.map(r=>`<tr>
-        <td data-label="순위">-</td>
-        <td class="mono-cell" data-label="수험번호">${escapeHtml(r.c.examNo||'-')}</td>
-        <td class="name-cell" data-label="이름">${escapeHtml(r.c.name)}</td>
-        <td colspan="4" class="sub-cell" data-label="진행 상태">평가 진행 중 (${r.doneCount}/3명 완료)</td>
+    const incompleteHtml = incomplete.map(r=>`<tr class="final-info-row">
+        <td><div class="cell-label">순위</div>-</td>
+        <td class="mono-cell"><div class="cell-label">수험번호</div>${escapeHtml(r.c.examNo||'-')}</td>
+        <td class="name-cell"><div class="cell-label">이름</div>${escapeHtml(r.c.name)}</td>
+        <td class="sub-cell" colspan="3" style="width:50%;"><div class="cell-label">기본정보</div>${basicInfoCell(r.c)}</td>
+        <td class="exp-cell" colspan="3" style="width:50%;"><div class="cell-label">경력</div>${renderCareerCell(r.c)}</td>
+      </tr><tr class="final-score-row">
+        <td colspan="${letters.length+1}" class="sub-cell">평가 진행 중 (${r.doneCount}/${letters.length}명 완료)</td>
       </tr>`).join('');
-    const table = el(`<table class="responsive-table">
-      <thead><tr><th>순위</th><th>수험번호</th><th>이름</th><th>면접관 A</th><th>면접관 B</th><th>면접관 C</th><th>총점 (300점)</th></tr></thead>
+    const table = el(`<table class="final-table">
       <tbody>${rowsHtml || ''}${incompleteHtml}</tbody>
     </table>`);
     if(!complete.length && !incomplete.length){
@@ -947,6 +1467,11 @@
       return wrap;
     }
  
+    const activeRound = state.rounds.find(r => r.id === state.activeRoundId);
+    wrap.appendChild(el(`<div class="banner info" style="margin-bottom:10px;">
+      📌 지금 채점 중인 회차: <b>${escapeHtml(activeRound ? activeRound.name : '(이름 없음)')}</b> — 관리자가 지정한 회차이며, 이 화면에서는 바꿀 수 없습니다. 인사팀에서 안내받은 회차와 같은지 확인해주세요.
+    </div>`));
+ 
     if(state.candidates.length === 0){
       wrap.appendChild(el(`<div class="card"><div class="empty-state"><div class="big">아직 등록된 지원자가 없습니다</div>관리자가 지원자 명단을 업로드하면 이곳에 표시됩니다.</div></div>`));
       return wrap;
@@ -956,11 +1481,26 @@
       🔒 면접관 ${letter}님은 본인이 입력한 점수만 볼 수 있습니다. 다른 면접관의 점수와 순위는 관리자가 <b>전체 순위 공개</b>를 하기 전까지 보이지 않습니다.
     </div>`));
  
+    const nameCard = el(`
+      <div class="card" style="margin-top:16px;">
+        <div class="card-head">
+          <div>
+            <p class="card-title">면접관 이름</p>
+            <p class="card-sub">이번 회차에서 면접관 ${letter} 역할로 채점하시는 분의 실제 이름을 적어주세요. 나중에 결과와 함께 저장되어 관리자가 "누가 어떤 역할이었는지" 확인할 수 있습니다.</p>
+          </div>
+          <input type="text" class="filter-input" id="interviewerNameInput" placeholder="예: 홍길동" value="${escapeAttr(state.interviewerNames[letter] || '')}" style="width:160px;" />
+        </div>
+      </div>`);
+    const nameInput = nameCard.querySelector('#interviewerNameInput');
+    nameInput.addEventListener('change', ()=> setInterviewerName(state.activeRoundId, letter, nameInput.value.trim()));
+    wrap.appendChild(nameCard);
+ 
+    const myName = state.interviewerNames[letter];
     const scoreCard = el(`
       <div class="card" style="margin-top:16px;">
         <div class="card-head">
           <div>
-            <p class="card-title">지원자 평가 (면접관 ${letter})</p>
+            <p class="card-title">지원자 평가 (면접관 ${letter}${myName ? ' · '+escapeHtml(myName) : ''})</p>
             <p class="card-sub">직무적합도 · 조직적합도를 각각 등급으로 입력하면 자동으로 환산됩니다 (A=100, B+=95, B=90, C=80, D=70, E=0)</p>
           </div>
           <input type="text" class="filter-input" id="filterInput" placeholder="이름 또는 수험번호로 검색" value="${escapeAttr(state.filter)}" />
@@ -995,7 +1535,7 @@
           <td class="mono-cell" data-label="순번">${i+1}</td>
           <td class="mono-cell" data-label="수험번호">${escapeHtml(r.c.examNo||'-')}</td>
           <td class="name-cell" data-label="이름">${escapeHtml(r.c.name)}</td>
-          <td class="sub-cell" data-label="기본정보">${escapeHtml(r.c.dob||'-')} · ${escapeHtml(r.c.gender||'-')}${r.c.age ? ' · '+escapeHtml(r.c.age) : ''}<br>${escapeHtml(r.c.university||'-')} ${escapeHtml(r.c.department||'')}</td>
+          <td class="sub-cell" data-label="기본정보">${renderBasicInfoHtml(r.c)}</td>
           <td class="exp-cell" data-label="경력">${renderCareerCell(r.c)}</td>
           <td data-label="평균"><span class="avg-pill">${fmt(r.avg)}점</span></td>
         </tr>`).join('');
@@ -1005,12 +1545,13 @@
  
     // if revealed, show final table too
     if(state.revealed){
+      const roundInterviewerCount2 = activeInterviewerLetters(state.activeRoundId).length;
       const finalCard = el(`
         <div class="card">
           <div class="card-head">
             <div>
               <p class="card-title">전체 최종 순위 (공개됨)</p>
-              <p class="card-sub">관리자가 전체 결과를 공개했습니다. 3명 면접관 점수를 합산한 순위입니다.</p>
+              <p class="card-sub">관리자가 전체 결과를 공개했습니다. ${roundInterviewerCount2}명 면접관 점수를 합산한 순위입니다.</p>
             </div>
           </div>
           <div class="table-wrap" id="finalTableWrap2"></div>
@@ -1046,7 +1587,7 @@
         <td class="mono-cell" data-label="순번">${i+1}</td>
         <td class="mono-cell" data-label="수험번호">${escapeHtml(c.examNo||'-')}</td>
         <td class="name-cell" data-label="이름">${escapeHtml(c.name)}</td>
-        <td class="sub-cell" data-label="기본 정보">${escapeHtml(c.dob||'-')} · ${escapeHtml(c.gender||'-')}${c.age ? ' · '+escapeHtml(c.age) : ''}<br>${escapeHtml(c.university||'-')} ${escapeHtml(c.department||'')}</td>
+        <td class="sub-cell" data-label="기본 정보">${renderBasicInfoHtml(c)}</td>
         <td class="exp-cell" data-label="경력">${renderCareerCell(c)}</td>
         <td data-label="직무적합도"></td>
         <td data-label="조직적합도"></td>
@@ -1099,20 +1640,81 @@
   function renderCareerCell(c){
     const careers = c.careers || [];
     if(careers.length === 0){
-      return escapeHtml(c.otherInfo || '-');
+      return '-';
     }
-    const items = careers.map((entry, i)=>{
+    return careers.map((entry, i)=>{
       const { name, period: embeddedPeriod } = splitCompanyPeriod(entry.company);
-      const period = entry.period || embeddedPeriod;
-      const parts = [];
-      if(name) parts.push(`<b>${escapeHtml(name)}</b>`);
-      if(entry.type) parts.push(escapeHtml(entry.type));
-      const main = parts.join(' ') || '-';
-      const periodTxt = period ? ` <span class="sub-cell">(${escapeHtml(period)})</span>` : '';
-      return `<div class="career-item"><span class="career-idx">${i+1}</span>${main}${periodTxt}</div>`;
+      const period = !isBlankValue(entry.period) ? entry.period : embeddedPeriod;
+      const deptTypeParts = [];
+      if(!isBlankValue(entry.department)) deptTypeParts.push(escapeHtml(entry.department));
+      if(!isBlankValue(entry.type)) deptTypeParts.push(escapeHtml(entry.type));
+      const deptTypeLine = deptTypeParts.length ? `<div class="career-item-detail">${deptTypeParts.join(' · ')}</div>` : '';
+      const periodLine = !isBlankValue(period) ? `<div class="career-item-detail">${escapeHtml(period)}</div>` : '';
+      return `<div class="career-item">
+        <div class="career-item-main"><span class="career-idx">${i+1}</span><b>${!isBlankValue(name) ? escapeHtml(name) : '-'}</b></div>
+        ${deptTypeLine}
+        ${periodLine}
+      </div>`;
     }).join('');
-    const otherLine = c.otherInfo ? `<div class="sub-cell" style="margin-top:4px;">${escapeHtml(c.otherInfo)}</div>` : '';
-    return items + otherLine;
+  }
+ 
+  // 기본정보(생년월일/성별/나이 · 대학/전공 · 대학원/전공)를 여러 표에서 동일하게 표시하기
+  // 위한 공통 렌더러. 대학원 정보는 있을 때만 한 줄 추가로 보여준다.
+  // 채용시스템 원본 파일은 "해당없음"을 종종 빈 문자열 대신 하이픈(-)으로 채워 넣는다.
+  // 그대로 두면 "-"가 마치 실제 값인 것처럼 표시되므로, 빈 값으로 간주해 걸러낸다.
+  function isBlankValue(v){
+    const s = String(v ?? '').trim();
+    return s === '' || s === '-';
+  }
+ 
+  // "주전공 : 국문학과(...)\n복수전공 : 철학과(...)" 형태의 텍스트를 주전공/복수전공으로 분리.
+  // 접두어가 없으면 통째로 주전공으로 취급한다.
+  function parseMajorText(raw){
+    if(isBlankValue(raw)) return { major:'', doubleMajor:'' };
+    const lines = String(raw).split(/\n/).map(s=>s.trim()).filter(Boolean);
+    let major = '', doubleMajor = '';
+    lines.forEach(line=>{
+      const m = line.match(/^(주전공|복수전공)\s*[:：]\s*(.*)$/);
+      if(m){
+        if(m[1] === '주전공') major = m[2].trim();
+        else doubleMajor = m[2].trim();
+      } else if(!major){
+        major = line;
+      }
+    });
+    return { major, doubleMajor };
+  }
+ 
+  function renderBasicInfoHtml(c){
+    const line1 = `${escapeHtml(c.dob||'-')} · ${escapeHtml(c.gender||'-')}${c.age ? ' · '+escapeHtml(c.age) : ''}`;
+ 
+    const blocks = [];
+ 
+    // (학사) 대학교명 / 주전공 / 복수전공
+    if(!isBlankValue(c.university)){
+      const { major, doubleMajor } = parseMajorText(c.department);
+      const lines = [`(학사) ${escapeHtml(c.university)}`];
+      if(major) lines.push(`(학사) ${escapeHtml(major)}`);
+      if(doubleMajor) lines.push(`(학사) ${escapeHtml(doubleMajor)} (복수전공)`);
+      blocks.push(lines.join('<br>'));
+    }
+ 
+    // 대학원1/대학원2 각각을 실제 학위구분(석사/박사) 값에 맞게 표시. 파일에 대학원2가
+    // 없으면(대부분의 경우) 대학원1만 표시된다.
+    [
+      { school: c.gradSchool1, major: c.gradMajor1, degree: c.gradDegree1 },
+      { school: c.gradSchool2, major: c.gradMajor2, degree: c.gradDegree2 },
+    ].forEach(grad => {
+      if(isBlankValue(grad.school)) return;
+      const degreeLabel = /박사/.test(grad.degree||'') ? '박사' : '석사';
+      const { major: gradMajorClean } = parseMajorText(grad.major);
+      const lines = [`(${degreeLabel}) ${escapeHtml(grad.school)}`];
+      if(gradMajorClean) lines.push(`(${degreeLabel}) ${escapeHtml(gradMajorClean)}`);
+      blocks.push(lines.join('<br>'));
+    });
+ 
+    const blocksHtml = blocks.map(b => `<div style="margin-top:6px;">${b}</div>`).join('');
+    return `${line1}${blocksHtml}`;
   }
  
   // ---------- boot ----------
@@ -1122,6 +1724,4 @@
 </script>
 </body>
 </html>
-
-
-
+ 
